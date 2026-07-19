@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/dispatch_notification_controller.dart';
 import 'package:urban_goodz_driver/models/notification_model.dart';
 import 'package:urban_goodz_driver/screens/business_job_detail_screen.dart';
+import 'package:urban_goodz_driver/screens/dedicated_route_detail_screen.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -156,11 +157,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               : null,
           onTap: () {
             if (isUnread) controller.markRead(n.id);
-            if (n.jobId != null &&
-                (n.jobType == 'business_courier' ||
-                    n.jobType == 'business_courier_assigned' ||
-                    n.jobType == 'business_courier_updated')) {
-              Get.to(() => BusinessJobDetailScreen(jobId: n.jobId!));
+            if (n.jobId != null) {
+              if (n.jobType == 'business_courier' ||
+                  n.jobType == 'business_courier_assigned' ||
+                  n.jobType == 'business_courier_updated') {
+                Get.to(() => BusinessJobDetailScreen(jobId: n.jobId!));
+              } else if (n.jobType == 'dedicated_route' ||
+                  n.jobType == 'dedicated_route_assigned' ||
+                  n.jobType == 'dedicated_route_updated') {
+                Get.to(() => DedicatedRouteDetailScreen(routeId: n.jobId!));
+              }
             }
           },
         ),

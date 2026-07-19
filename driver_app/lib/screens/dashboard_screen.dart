@@ -17,6 +17,7 @@ import 'package:urban_goodz_driver/screens/opportunities_screen.dart';
 import 'package:urban_goodz_driver/screens/payout_history_screen.dart';
 import 'package:urban_goodz_driver/screens/route_details_screen.dart';
 import 'package:urban_goodz_driver/screens/vehicle_requirements_screen.dart';
+import 'package:urban_goodz_driver/screens/dedicated_route_list_screen.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -415,6 +416,18 @@ class _DashboardBody extends StatelessWidget {
                     label: 'Payouts',
                     color: AppTheme.accent,
                     onTap: () => Get.to(() => const PayoutHistoryScreen()),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  _QuickAction(
+                    icon: Icons.local_shipping,
+                    label: 'Dedicated',
+                    color: AppTheme.primary,
+                    onTap: () => Get.to(() => const DedicatedRouteListScreen()),
                   ),
                 ],
               ),

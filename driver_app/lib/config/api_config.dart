@@ -102,4 +102,20 @@ class ApiConfig {
       '$driverApiPrefix/certifications/$id/upload';
   static String certificationRenew(int id) =>
       '$driverApiPrefix/certifications/$id/renew';
+
+  // Dedicated Routes (Stage A & B)
+  static const String assignedRoutes = '$driverApiPrefix/routes';
+  static String routeDetail(int routeId) => '$driverApiPrefix/routes/$routeId';
+  static String resequenceRoute(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/sequence';
+  static String routeStarted(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/started';
+  static String routeCompleted(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/completed';
+  static String scanPickup(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/scan-pickup';
+  static String scanDropoff(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/scan-dropoff';
+  static String scanException(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/scan-exception';
 }

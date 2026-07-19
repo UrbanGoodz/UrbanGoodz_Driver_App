@@ -575,4 +575,83 @@ class DriverApiService extends GetxService {
         ? Map<String, dynamic>.from(body['data'])
         : {};
   }
+
+  // ---------- Dedicated Routes (Stage A & B) ----------
+
+  Future<List<dynamic>> getAssignedRoutes() async {
+    final body = await _ok(await _client.authGet(ApiConfig.assignedRoutes));
+    return (body is Map && body['routes'] is List) ? body['routes'] as List : [];
+  }
+
+  Future<Map<String, dynamic>> getRouteDetail(int routeId) async {
+    final body = await _ok(await _client.authGet(ApiConfig.routeDetail(routeId)));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> resequenceRoute(int routeId, String endpointType) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.resequenceRoute(routeId), {'endpoint_type': endpointType}),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> startRoute(int routeId) async {
+    final body = await _ok(await _client.authPost(ApiConfig.routeStarted(routeId), {}));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> completeRoute(int routeId) async {
+    final body = await _ok(await _client.authPost(ApiConfig.routeCompleted(routeId), {}));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> scanPickup(
+    int routeId, {
+    required String barcode,
+    required double lat,
+    required double lng,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.scanPickup(routeId), {
+        'barcode': barcode,
+        'lat': lat,
+        'lng': lng,
+      }),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> scanDropoff(
+    int routeId, {
+    required String barcode,
+    required double lat,
+    required double lng,
+    String? proofPhoto,
+    String? signature,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.scanDropoff(routeId), {
+        'barcode': barcode,
+        'lat': lat,
+        'lng': lng,
+        if (proofPhoto != null) 'proof_photo': proofPhoto,
+        if (signature != null) 'signature': signature,
+      }),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> scanException(
+    int routeId, {
+    required String barcode,
+    required String reason,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.scanException(routeId), {
+        'barcode': barcode,
+        'reason': reason,
+      }),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
 }
