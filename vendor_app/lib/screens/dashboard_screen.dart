@@ -12,6 +12,7 @@ import 'package:urban_goodz_vendor/screens/revenue_tracking_screen.dart';
 import 'package:urban_goodz_vendor/screens/service_bookings_screen.dart';
 import 'package:urban_goodz_vendor/screens/reels_screen.dart';
 import 'package:urban_goodz_vendor/screens/notifications_support_screen.dart';
+import 'package:urban_goodz_vendor/screens/vendor_ai_assistant_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   DashboardScreen({super.key});
@@ -81,6 +82,10 @@ class _DashboardTab extends StatelessWidget {
           () => Text(Get.find<VendorAuthController>().businessName.value),
         ),
         actions: [
+          IconButton(
+            onPressed: () => Get.to(() => const VendorAiAssistantScreen()),
+            icon: const Icon(Icons.auto_awesome),
+          ),
           IconButton(
             onPressed: () => Get.to(() => const NotificationsSupportScreen()),
             icon: const Icon(Icons.notifications_none),

@@ -654,4 +654,53 @@ class DriverApiService extends GetxService {
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
+
+  // ---------- AI Assistant Endpoints ----------
+
+  Future<Map<String, dynamic>> getAiDailySummary() async {
+    final body = await _ok(await _client.authGet(ApiConfig.aiDailySummary));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> getAiRouteOptimization(int routeId, {String? preference}) async {
+    final body = await _ok(await _client.authPost(ApiConfig.aiRouteOptimization, {
+      'route_id': routeId,
+      if (preference != null) 'preference': preference,
+    }));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> verifyPackageAi(int packageId, String photoBase64, double lat, double lng) async {
+    final body = await _ok(await _client.authPost(ApiConfig.aiVerifyPackage, {
+      'package_id': packageId,
+      'photo': photoBase64,
+      'gps_lat': lat,
+      'gps_lng': lng,
+    }));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> verifyDeliveryAi(int packageId, String photoBase64, double lat, double lng, {String? recipientName, String? dropoffInstructions}) async {
+    final body = await _ok(await _client.authPost(ApiConfig.aiVerifyDelivery, {
+      'package_id': packageId,
+      'photo': photoBase64,
+      'gps_lat': lat,
+      'gps_lng': lng,
+      if (recipientName != null) 'recipient_name': recipientName,
+      if (dropoffInstructions != null) 'dropoff_instructions': dropoffInstructions,
+    }));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> getAiLoadRecommendations() async {
+    final body = await _ok(await _client.authPost(ApiConfig.aiLoadRecommendations, {}));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  Future<Map<String, dynamic>> getAiEarningsComparison({String? period}) async {
+    final body = await _ok(await _client.authPost(ApiConfig.aiEarningsComparison, {
+      if (period != null) 'period': period,
+    }));
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
 }

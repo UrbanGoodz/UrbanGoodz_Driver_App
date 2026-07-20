@@ -18,6 +18,7 @@ import 'package:urban_goodz_driver/screens/payout_history_screen.dart';
 import 'package:urban_goodz_driver/screens/route_details_screen.dart';
 import 'package:urban_goodz_driver/screens/vehicle_requirements_screen.dart';
 import 'package:urban_goodz_driver/screens/dedicated_route_list_screen.dart';
+import 'package:urban_goodz_driver/screens/driver_ai_assistant_screen.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -101,6 +102,17 @@ class _DashboardBody extends StatelessWidget {
             ],
           ),
           actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: GestureDetector(
+                onTap: () => Get.to(() => const DriverAiAssistantScreen()),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.white,
+                  size: 26,
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: GestureDetector(

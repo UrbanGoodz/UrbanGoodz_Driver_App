@@ -118,4 +118,13 @@ class ApiConfig {
       '$driverApiPrefix/routes/$routeId/scan-dropoff';
   static String scanException(int routeId) =>
       '$driverApiPrefix/routes/$routeId/scan-exception';
+
+  // AI Assistant
+  static const String aiDriverPrefix = '/api/v1/urban-goodz/cross-app/ai/driver';
+  static const String aiDailySummary = '$aiDriverPrefix/daily-summary';
+  static const String aiRouteOptimization = '$aiDriverPrefix/route-optimization';
+  static const String aiVerifyPackage = '$aiDriverPrefix/verify-package';
+  static const String aiVerifyDelivery = '$aiDriverPrefix/verify-delivery';
+  static const String aiLoadRecommendations = '$aiDriverPrefix/load-recommendations';
+  static const String aiEarningsComparison = '$aiDriverPrefix/earnings-comparison';
 }
