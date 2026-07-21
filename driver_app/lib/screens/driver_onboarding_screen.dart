@@ -127,8 +127,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                     'Sign in with your driver account',
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.accent,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.dark,
                     ),
                   ),
                 ),
