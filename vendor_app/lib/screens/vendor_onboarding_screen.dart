@@ -116,20 +116,24 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextFormField(
-                              controller: emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              autofillHints: const [AutofillHints.email],
-                              decoration: const InputDecoration(
-                                hintText: 'Enter your email address',
-                                prefixIcon: Icon(Icons.email_outlined, size: 20),
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            Semantics(
+                              label: 'Vendor Email',
+                              child: TextFormField(
+                                key: const Key('vendor_login_email'),
+                                controller: emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.email],
+                                decoration: const InputDecoration(
+                                  hintText: 'Vendor email',
+                                  prefixIcon: Icon(Icons.email_outlined, size: 20),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                                validator: (value) =>
+                                    value == null || !value.contains('@')
+                                    ? 'Enter a valid Vendor email.'
+                                    : null,
                               ),
-                              validator: (value) =>
-                                  value == null || !value.contains('@')
-                                  ? 'Enter a valid Vendor email.'
-                                  : null,
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -141,31 +145,35 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextFormField(
-                              controller: passwordController,
-                              obscureText: obscurePassword,
-                              autofillHints: const [AutofillHints.password],
-                              decoration: InputDecoration(
-                                hintText: 'Enter your password',
-                                prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                                border: const OutlineInputBorder(),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(
-                                    () => obscurePassword = !obscurePassword,
-                                  ),
-                                  icon: Icon(
-                                    obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    size: 20,
+                            Semantics(
+                              label: 'Vendor Password',
+                              child: TextFormField(
+                                key: const Key('vendor_login_password'),
+                                controller: passwordController,
+                                obscureText: obscurePassword,
+                                autofillHints: const [AutofillHints.password],
+                                decoration: InputDecoration(
+                                  hintText: 'Enter your password',
+                                  prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                                  border: const OutlineInputBorder(),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  suffixIcon: IconButton(
+                                    onPressed: () => setState(
+                                      () => obscurePassword = !obscurePassword,
+                                    ),
+                                    icon: Icon(
+                                      obscurePassword
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
+                                validator: (value) =>
+                                    value == null || value.length < 6
+                                    ? 'Password must be at least 6 characters.'
+                                    : null,
                               ),
-                              validator: (value) =>
-                                  value == null || value.length < 6
-                                  ? 'Password must be at least 6 characters.'
-                                  : null,
                             ),
                             const SizedBox(height: 10),
                             Wrap(
@@ -243,7 +251,8 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Text(
-                                            'Sign In',
+                                            'Login',
+                                            key: Key('vendor_login_submit'),
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,

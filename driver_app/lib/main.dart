@@ -38,7 +38,9 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _restoreSession() async {
-    await _authController.restoreSession();
+    try {
+      await _authController.restoreSession().timeout(const Duration(seconds: 10));
+    } catch (_) {}
     if (mounted) {
       setState(() => _sessionRestored = true);
     }

@@ -182,17 +182,21 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextFormField(
-                              controller: _phoneController,
-                              decoration: const InputDecoration(
-                                hintText: 'Enter phone or email',
-                                prefixIcon: Icon(Icons.phone_outlined, size: 20),
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            Semantics(
+                              label: 'Driver Email',
+                              child: TextFormField(
+                                key: const Key('driver_login_email'),
+                                controller: _phoneController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Enter phone or email',
+                                  prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (val) =>
+                                    val == null || val.trim().isEmpty ? 'Required' : null,
                               ),
-                              keyboardType: TextInputType.emailAddress,
-                              validator: (val) =>
-                                  val == null || val.trim().isEmpty ? 'Required' : null,
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -204,25 +208,29 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              decoration: InputDecoration(
-                                hintText: 'Enter password',
-                                prefixIcon: const Icon(Icons.lock_outline, size: 20),
-                                border: const OutlineInputBorder(),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                    size: 20,
+                            Semantics(
+                              label: 'Driver Password',
+                              child: TextFormField(
+                                key: const Key('driver_login_password'),
+                                controller: _passwordController,
+                                obscureText: _obscurePassword,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter password',
+                                  prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                                  border: const OutlineInputBorder(),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                   ),
-                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                 ),
+                                validator: (val) => val == null || val.length < 6
+                                    ? 'Minimum 6 characters'
+                                    : null,
                               ),
-                              validator: (val) => val == null || val.length < 6
-                                  ? 'Minimum 6 characters'
-                                  : null,
                             ),
                             const SizedBox(height: 10),
                             Wrap(
@@ -259,6 +267,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton(
+                              key: const Key('driver_login_submit'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.primary,
                                 foregroundColor: AppTheme.white,

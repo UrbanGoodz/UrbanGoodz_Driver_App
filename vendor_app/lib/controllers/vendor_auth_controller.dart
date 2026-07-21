@@ -58,24 +58,30 @@ class VendorAuthController extends GetxController {
   }
 
   Future<void> _restoreSession() async {
-    final preferences = await SharedPreferences.getInstance();
-    final token = preferences.getString(_tokenKey);
-    email.value = preferences.getString(_emailKey) ?? '';
-    if (token != null && token.isNotEmpty) {
-      api.setToken(token);
-      try {
-        await refreshProfile();
-        isLoggedIn.value = true;
-        await _registerFcmToken();
-      } on VendorApiException catch (error) {
-        if (error.statusCode == 401 || error.statusCode == 403) {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final token = preferences.getString(_tokenKey);
+      email.value = preferences.getString(_emailKey) ?? '';
+      if (token != null && token.isNotEmpty) {
+        api.setToken(token);
+        try {
+          await refreshProfile().timeout(const Duration(seconds: 15));
+          isLoggedIn.value = true;
+          await _registerFcmToken();
+        } on VendorApiException catch (error) {
+          if (error.statusCode == 401 || error.statusCode == 403) {
+            await _clearSession();
+          } else {
+            errorMessage.value = error.message;
+          }
+        } catch (_) {
           await _clearSession();
-        } else {
-          errorMessage.value = error.message;
         }
       }
+    } catch (_) {
+    } finally {
+      isInitialized.value = true;
     }
-    isInitialized.value = true;
   }
 
   Future<bool> login(String emailAddress, String password) async {
