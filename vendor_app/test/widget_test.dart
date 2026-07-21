@@ -19,7 +19,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Urban Goodz Vendor'), findsOneWidget);
-    expect(find.text('SIGN IN'), findsOneWidget);
+    expect(find.text('Sign In'), findsOneWidget);
     expect(find.text('ENTER TESTER VENDOR MODE'), findsNothing);
   });
 }

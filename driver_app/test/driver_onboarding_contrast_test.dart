@@ -32,20 +32,20 @@ void main() {
 
     // Verify main title & subtitle
     expect(find.text('Urban Goodz Driver'), findsOneWidget);
-    expect(find.text('Sign in with your driver account'), findsOneWidget);
+    expect(find.text('Driver Login'), findsOneWidget);
 
-    // Verify subtitle text uses dark high contrast color (not accent yellow)
-    final Text subtitleText = tester.widget(find.text('Sign in with your driver account'));
-    expect(subtitleText.style?.color, AppTheme.dark);
+    // Verify subtitle text uses dark high contrast color
+    final Text titleText = tester.widget(find.text('Urban Goodz Driver'));
+    expect(titleText.style?.color, AppTheme.dark);
 
     // Verify input fields & action buttons are visible
-    expect(find.widgetWithText(TextFormField, 'Phone Number'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'SIGN IN'), findsOneWidget);
-    expect(find.text('Apply to Join as a Driver'), findsOneWidget);
+    expect(find.text('Phone Number / Email'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(2));
+    expect(find.widgetWithText(ElevatedButton, 'Sign In'), findsOneWidget);
+    expect(find.text('Create Account'), findsOneWidget);
 
     // Test validation state
-    await tester.tap(find.widgetWithText(ElevatedButton, 'SIGN IN'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Sign In'));
     await tester.pumpAndSettle();
     expect(find.text('Required'), findsOneWidget);
   });
