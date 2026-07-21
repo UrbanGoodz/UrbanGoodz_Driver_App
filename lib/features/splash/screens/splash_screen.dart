@@ -70,29 +70,53 @@ class SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _route(NotificationBodyModel? body) async {
-    await Get.find<SplashController>().getConfigData(notificationBody: body);
+    try {
+      await Get.find<SplashController>().getConfigData(notificationBody: body).timeout(const Duration(seconds: 5));
+    } catch (_) {}
     Timer(const Duration(seconds: 1), () async {
-      double? minimumVersion = _getMinimumVersion();
-      bool isMaintenanceMode = Get.find<SplashController>().configModel!.maintenanceMode!;
-      bool needsUpdate = AppConstants.appVersion < minimumVersion!;
-
-      if(needsUpdate || isMaintenanceMode) {
-        Get.offNamed(RouteHelper.getUpdateRoute(needsUpdate));
-      }else {
-        if(widget.body != null) {
-          _forNotificationRouteProcess(widget.body);
-        }else {
-          _handleUserRouting();
+      try {
+        if (Get.find<SplashController>().configModel == null) {
+          _fallbackNavigation();
+          return;
         }
+        double? minimumVersion = _getMinimumVersion();
+        bool isMaintenanceMode = Get.find<SplashController>().configModel?.maintenanceMode ?? false;
+        bool needsUpdate = minimumVersion != null && AppConstants.appVersion < minimumVersion;
+
+        if (needsUpdate || isMaintenanceMode) {
+          Get.offNamed(RouteHelper.getUpdateRoute(needsUpdate));
+        } else {
+          if (widget.body != null) {
+            _forNotificationRouteProcess(widget.body);
+          } else {
+            _handleUserRouting();
+          }
+        }
+      } catch (_) {
+        _fallbackNavigation();
       }
     });
   }
 
+  void _fallbackNavigation() {
+    try {
+      if (AuthHelper.isLoggedIn()) {
+        Get.offNamed(RouteHelper.getInitialRoute(fromSplash: true));
+      } else {
+        Get.offNamed(RouteHelper.getSignInRoute(RouteHelper.splash));
+      }
+    } catch (_) {
+      Get.offNamed(RouteHelper.getSignInRoute(RouteHelper.splash));
+    }
+  }
+
   double? _getMinimumVersion() {
+    final config = Get.find<SplashController>().configModel;
+    if (config == null) return 0;
     if (GetPlatform.isAndroid) {
-      return Get.find<SplashController>().configModel!.appMinimumVersionAndroid;
+      return config.appMinimumVersionAndroid;
     } else if (GetPlatform.isIOS) {
-      return Get.find<SplashController>().configModel!.appMinimumVersionIos;
+      return config.appMinimumVersionIos;
     }
     return 0;
   }
@@ -137,11 +161,7 @@ class SplashScreenState extends State<SplashScreen> {
   }
 
   void _forGuestUserRouteProcess() {
-    if (AddressHelper.getUserAddressFromSharedPref() != null) {
-      Get.offNamed(RouteHelper.getInitialRoute(fromSplash: true));
-    } else {
-      Get.find<LocationController>().navigateToLocationScreen('splash', offNamed: true);
-    }
+    Get.offNamed(RouteHelper.getSignInRoute(RouteHelper.splash));
   }
 
   Future<void> _handleUserRouting() async {
@@ -149,11 +169,8 @@ class SplashScreenState extends State<SplashScreen> {
       _forLoggedInUserRouteProcess();
     } else if (Get.find<SplashController>().showIntro() == true) {
       _newlyRegisteredRouteProcess();
-    } else if (AuthHelper.isGuestLoggedIn()) {
-      _forGuestUserRouteProcess();
     } else {
-      await Get.find<AuthController>().guestLogin();
-      _forGuestUserRouteProcess();
+      Get.offNamed(RouteHelper.getSignInRoute(RouteHelper.splash));
     }
   }
 
