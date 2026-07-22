@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:urban_goodz_driver/screens/driver_onboarding_screen.dart';
 
 class DriverAuthController extends GetxController {
   var isLoggedIn = false.obs;
@@ -57,5 +58,6 @@ class DriverAuthController extends GetxController {
     isLoggedIn.value = false;
     clearToken();
     SharedPreferences.getInstance().then((p) => p.clear());
+    Get.offAll(() => const DriverOnboardingScreen());
   }
 }

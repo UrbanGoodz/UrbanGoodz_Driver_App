@@ -28,13 +28,13 @@ android {
     signingConfigs {
         create("release") {
             val keyProperties = Properties()
-            val keyPropertiesFile = rootProject.file("key.properties")
+            val keyPropertiesFile = file("../key.properties")
             if (keyPropertiesFile.exists()) {
                 keyProperties.load(FileInputStream(keyPropertiesFile))
             }
             val storeFilePath = keyProperties.getProperty("storeFile") ?: ""
             storeFile = if (storeFilePath.isNotBlank()) {
-                if (File(storeFilePath).isAbsolute) File(storeFilePath) else rootProject.file(storeFilePath)
+                if (File(storeFilePath).isAbsolute) File(storeFilePath) else file("../$storeFilePath")
             } else File("")
             storePassword = keyProperties.getProperty("storePassword") ?: ""
             keyAlias = keyProperties.getProperty("keyAlias") ?: ""
@@ -64,4 +64,9 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+    implementation("com.google.firebase:firebase-analytics")
 }

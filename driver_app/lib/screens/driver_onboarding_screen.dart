@@ -276,25 +276,31 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'URBAN GOODZ',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.dark,
-                                letterSpacing: -0.3,
+                            Semantics(
+                              label: 'driver_brand_title',
+                              child: Text(
+                                'URBAN GOODZ',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.dark,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
                             ),
-                            Text(
-                              'DRIVER PARTNER LOGISTICS',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.primary,
-                                letterSpacing: 1.8,
+                            Semantics(
+                              label: 'driver_brand_subtitle',
+                              child: Text(
+                                'DRIVER PARTNER LOGISTICS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.primary,
+                                  letterSpacing: 1.8,
+                                ),
                               ),
                             ),
                           ],
@@ -365,27 +371,31 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                 child: Row(
                                   children: [
                                     Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => setState(() {
-                                          _isPhoneMode = true;
-                                          _error = null;
-                                        }),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: _isPhoneMode ? Colors.white : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(10),
-                                            boxShadow: _isPhoneMode
-                                                ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
-                                                : null,
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              'Phone OTP',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppTheme.dark,
+                                      child: Semantics(
+                                        label: 'driver_phone_tab',
+                                        button: true,
+                                        child: GestureDetector(
+                                          onTap: () => setState(() {
+                                            _isPhoneMode = true;
+                                            _error = null;
+                                          }),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: _isPhoneMode ? Colors.white : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(10),
+                                              boxShadow: _isPhoneMode
+                                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
+                                                  : null,
+                                            ),
+                                            child: const Center(
+                                              child: Text(
+                                                'Phone OTP',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppTheme.dark,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -393,27 +403,31 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                       ),
                                     ),
                                     Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => setState(() {
-                                          _isPhoneMode = false;
-                                          _error = null;
-                                        }),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: !_isPhoneMode ? Colors.white : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(10),
-                                            boxShadow: !_isPhoneMode
-                                                ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
-                                                : null,
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              'Email / Password',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppTheme.dark,
+                                      child: Semantics(
+                                        label: 'driver_email_tab',
+                                        button: true,
+                                        child: GestureDetector(
+                                          onTap: () => setState(() {
+                                            _isPhoneMode = false;
+                                            _error = null;
+                                          }),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: !_isPhoneMode ? Colors.white : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(10),
+                                              boxShadow: !_isPhoneMode
+                                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
+                                                  : null,
+                                            ),
+                                            child: const Center(
+                                              child: Text(
+                                                'Email / Password',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppTheme.dark,
+                                                ),
                                               ),
                                             ),
                                           ),

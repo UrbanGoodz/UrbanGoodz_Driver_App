@@ -215,7 +215,7 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'URBAN GOODZ',
+                              'Urban Goodz Vendor',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
@@ -224,12 +224,12 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                               ),
                             ),
                             Text(
-                              'MERCHANT & STORE PORTAL',
+                              'Vendor Login',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                                 color: AppTheme.primary,
-                                letterSpacing: 1.8,
+                                letterSpacing: 1.5,
                               ),
                             ),
                           ],
@@ -442,165 +442,170 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
 
                                 const SizedBox(height: 8),
 
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: Checkbox(
-                                            value: rememberMe,
-                                            activeColor: AppTheme.primary,
-                                            onChanged: (val) => setState(() => rememberMe = val ?? true),
-                                          ),
+                                 Wrap(
+                                   alignment: WrapAlignment.spaceBetween,
+                                   crossAxisAlignment: WrapCrossAlignment.center,
+                                   children: [
+                                     Row(
+                                       mainAxisSize: MainAxisSize.min,
+                                       children: [
+                                         SizedBox(
+                                           width: 24,
+                                           height: 24,
+                                           child: Checkbox(
+                                             value: rememberMe,
+                                             activeColor: AppTheme.primary,
+                                             onChanged: (val) => setState(() => rememberMe = val ?? true),
+                                           ),
+                                         ),
+                                         const SizedBox(width: 4),
+                                         const Text('Remember me', style: TextStyle(fontSize: 12, color: AppTheme.dark)),
+                                       ],
+                                     ),
+                                      Semantics(
+                                        label: 'vendor_forgot_password',
+                                        child: TextButton(
+                                          key: const Key('vendor_forgot_password'),
+                                          onPressed: _showForgotPasswordDialog,
+                                          child: const Text('Forgot Password?', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.bold)),
                                         ),
-                                        const SizedBox(width: 6),
-                                        const Text('Remember me', style: TextStyle(fontSize: 13, color: AppTheme.dark)),
-                                      ],
-                                    ),
-                                    TextButton(
-                                      key: const Key('vendor_forgot_password'),
-                                      onPressed: _showForgotPasswordDialog,
-                                      child: const Text('Forgot Password?', style: TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 14),
-
-                                ElevatedButton(
-                                  key: const Key('vendor_login_submit'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primary,
-                                    foregroundColor: AppTheme.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: isLoading ? null : _loginWithPassword,
-                                  child: isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                        )
-                                      : const Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text('Sign In to Dashboard', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                            SizedBox(width: 8),
-                                            Icon(Icons.arrow_forward_rounded, size: 20),
-                                          ],
-                                        ),
-                                ),
-                              ] else ...[
-                                const Text(
-                                  'Merchant Mobile Phone',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.dark),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: const InputDecoration(
-                                    hintText: '+1 (555) 019-2834',
-                                    prefixIcon: Icon(Icons.phone_android_outlined, size: 20, color: AppTheme.primary),
-                                    border: OutlineInputBorder(),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 14),
-
-                                if (!otpSent)
-                                  ElevatedButton(
-                                    key: const Key('vendor_otp_request'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: AppTheme.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    onPressed: isLoading ? null : _handlePhoneOtpRequest,
-                                    child: isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                          )
-                                        : const Text('Send Verification OTP', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                  )
-                                else ...[
-                                  const Text(
-                                    'Enter Verification Code',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.dark),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Semantics(
-                                    label: 'vendor_otp_code',
-                                    child: TextFormField(
-                                      key: const Key('vendor_otp_code'),
-                                      controller: otpController,
-                                      keyboardType: TextInputType.number,
-                                      maxLength: 6,
-                                      style: const TextStyle(fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.bold),
-                                      textAlign: TextAlign.center,
-                                      decoration: const InputDecoration(
-                                        hintText: '123456',
-                                        counterText: '',
-                                        border: OutlineInputBorder(),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                       ),
-                                    ),
-                                  ),
+                                   ],
+                                 ),
 
-                                  const SizedBox(height: 14),
+                                 const SizedBox(height: 14),
 
-                                  ElevatedButton(
-                                    key: const Key('vendor_otp_verify'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: AppTheme.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    onPressed: isLoading ? null : _handleOtpVerification,
-                                    child: const Text('Verify & Enter Store', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ],
+                                 ElevatedButton(
+                                   key: const Key('vendor_login_submit'),
+                                   style: ElevatedButton.styleFrom(
+                                     backgroundColor: AppTheme.primary,
+                                     foregroundColor: AppTheme.white,
+                                     padding: const EdgeInsets.symmetric(vertical: 14),
+                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                   ),
+                                   onPressed: isLoading ? null : _loginWithPassword,
+                                   child: isLoading
+                                       ? const SizedBox(
+                                           height: 20,
+                                           width: 20,
+                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                         )
+                                       : const Row(
+                                           mainAxisAlignment: MainAxisAlignment.center,
+                                           children: [
+                                             Text('Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                             SizedBox(width: 8),
+                                             Icon(Icons.arrow_forward_rounded, size: 20),
+                                           ],
+                                         ),
+                                 ),
+                               ] else ...[
+                                 const Text(
+                                   'Merchant Mobile Phone',
+                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.dark),
+                                 ),
+                                 const SizedBox(height: 6),
+                                 TextFormField(
+                                   controller: phoneController,
+                                   keyboardType: TextInputType.phone,
+                                   decoration: const InputDecoration(
+                                     hintText: '+1 (555) 019-2834',
+                                     prefixIcon: Icon(Icons.phone_android_outlined, size: 20, color: AppTheme.primary),
+                                     border: OutlineInputBorder(),
+                                     contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                   ),
+                                 ),
 
-                              const SizedBox(height: 16),
+                                 const SizedBox(height: 14),
 
-                              Row(
-                                children: [
-                                  const Expanded(child: Divider()),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: Text('OR', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ),
-                                  const Expanded(child: Divider()),
-                                ],
-                              ),
+                                 if (!otpSent)
+                                   ElevatedButton(
+                                     key: const Key('vendor_otp_request'),
+                                     style: ElevatedButton.styleFrom(
+                                       backgroundColor: AppTheme.primary,
+                                       foregroundColor: AppTheme.white,
+                                       padding: const EdgeInsets.symmetric(vertical: 14),
+                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                     ),
+                                     onPressed: isLoading ? null : _handlePhoneOtpRequest,
+                                     child: isLoading
+                                         ? const SizedBox(
+                                             height: 20,
+                                             width: 20,
+                                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                           )
+                                         : const Text('Send Verification OTP', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                   )
+                                 else ...[
+                                   const Text(
+                                     'Enter Verification Code',
+                                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.dark),
+                                   ),
+                                   const SizedBox(height: 6),
+                                   Semantics(
+                                     label: 'vendor_otp_code',
+                                     child: TextFormField(
+                                       key: const Key('vendor_otp_code'),
+                                       controller: otpController,
+                                       keyboardType: TextInputType.number,
+                                       maxLength: 6,
+                                       style: const TextStyle(fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.bold),
+                                       textAlign: TextAlign.center,
+                                       decoration: const InputDecoration(
+                                         hintText: '123456',
+                                         counterText: '',
+                                         border: OutlineInputBorder(),
+                                         contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                       ),
+                                     ),
+                                   ),
 
-                              const SizedBox(height: 16),
+                                   const SizedBox(height: 14),
 
-                              OutlinedButton.icon(
-                                key: const Key('vendor_create_account'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.dark,
-                                  side: const BorderSide(color: AppTheme.primary, width: 1.5),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                                onPressed: () => Get.to(() => const VendorRegistrationScreen()),
-                                icon: const Icon(Icons.store_outlined, size: 20, color: AppTheme.dark),
-                                label: const Text(
-                                  'Register New Store / Merchant',
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.dark),
-                                ),
-                              ),
+                                   ElevatedButton(
+                                     key: const Key('vendor_otp_verify'),
+                                     style: ElevatedButton.styleFrom(
+                                       backgroundColor: AppTheme.primary,
+                                       foregroundColor: AppTheme.white,
+                                       padding: const EdgeInsets.symmetric(vertical: 14),
+                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                     ),
+                                     onPressed: isLoading ? null : _handleOtpVerification,
+                                     child: const Text('Verify & Enter Store', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                   ),
+                                 ],
+                               ],
+
+                               const SizedBox(height: 16),
+
+                               Row(
+                                 children: [
+                                   const Expanded(child: Divider()),
+                                   Padding(
+                                     padding: const EdgeInsets.symmetric(horizontal: 12),
+                                     child: Text('OR', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.bold)),
+                                   ),
+                                   const Expanded(child: Divider()),
+                                 ],
+                               ),
+
+                               const SizedBox(height: 16),
+
+                               OutlinedButton.icon(
+                                 key: const Key('vendor_create_account'),
+                                 style: OutlinedButton.styleFrom(
+                                   foregroundColor: AppTheme.dark,
+                                   side: const BorderSide(color: AppTheme.primary, width: 1.5),
+                                   padding: const EdgeInsets.symmetric(vertical: 14),
+                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                 ),
+                                 onPressed: () => Get.to(() => const VendorRegistrationScreen()),
+                                 icon: const Icon(Icons.store_outlined, size: 20, color: AppTheme.dark),
+                                 label: const Text(
+                                   'Create Account',
+                                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.dark),
+                                 ),
+                               ),
                             ],
                           ),
                         ),
