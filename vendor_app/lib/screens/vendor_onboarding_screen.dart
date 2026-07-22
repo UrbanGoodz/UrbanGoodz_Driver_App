@@ -62,11 +62,11 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
     await Future.delayed(const Duration(milliseconds: 700));
     final email = emailController.text.trim();
     auth.email.value = email;
-    auth.storeName.value = 'Urban Goodz Merchant Store';
+    auth.businessName.value = 'Urban Goodz Merchant Store';
     auth.isLoggedIn.value = true;
 
     setState(() => isLoading = false);
-    Get.offAll(() => const DashboardScreen());
+    Get.offAll(() => DashboardScreen());
   }
 
   Future<void> _handlePhoneOtpRequest() async {
@@ -101,11 +101,11 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
 
     await Future.delayed(const Duration(milliseconds: 700));
     auth.email.value = 'vendor@urbangoodz.com';
-    auth.storeName.value = 'Urban Goodz Merchant Store';
+    auth.businessName.value = 'Urban Goodz Merchant Store';
     auth.isLoggedIn.value = true;
 
     setState(() => isLoading = false);
-    Get.offAll(() => const DashboardScreen());
+    Get.offAll(() => DashboardScreen());
   }
 
   void _showForgotPasswordDialog() {
