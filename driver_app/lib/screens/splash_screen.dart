@@ -13,77 +13,97 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarBrightness: Brightness.dark,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppTheme.dark,
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: AppTheme.beige,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ));
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final logoSize = size.width * 0.35;
+    final logoSize = (size.width * 0.32).clamp(100.0, 160.0);
 
-    return Scaffold(
-      backgroundColor: AppTheme.dark,
-      body: SizedBox.expand(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: logoSize,
-              height: logoSize,
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(logoSize * 0.2),
-              ),
-              child: Center(
-                child: Text(
-                  'UG',
-                  style: TextStyle(
-                    fontSize: logoSize * 0.4,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.dark,
-                    letterSpacing: 2,
+    return Semantics(
+      label: 'driver_splash',
+      key: const Key('driver_splash'),
+      child: Scaffold(
+        backgroundColor: AppTheme.beige,
+        body: SafeArea(
+          child: SizedBox.expand(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: logoSize,
+                  height: logoSize,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(logoSize * 0.24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      'UG',
+                      style: TextStyle(
+                        fontSize: logoSize * 0.42,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.dark,
+                        letterSpacing: 2,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                SizedBox(height: size.height * 0.03),
+                const Text(
+                  'Urban Goodz',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.dark,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'DRIVER PLATFORM',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.dark,
+                      letterSpacing: 2.5,
+                    ),
+                  ),
+                ),
+                SizedBox(height: size.height * 0.06),
+                const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: size.height * 0.04),
-            Text(
-              'Urban Goodz',
-              style: TextStyle(
-                fontSize: size.width * 0.08,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.white,
-                letterSpacing: 1.5,
-              ),
-            ),
-            SizedBox(height: size.height * 0.01),
-            Text(
-              'DRIVER',
-              style: TextStyle(
-                fontSize: size.width * 0.045,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
-                letterSpacing: 4,
-              ),
-            ),
-            SizedBox(height: size.height * 0.08),
-            SizedBox(
-              width: 32,
-              height: 32,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: AppTheme.primary,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
