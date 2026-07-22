@@ -15,6 +15,72 @@
       },
       "oauth_client": [
         {
+          "client_id": "709013709032-2n854bdopaot34pcnuvk4h1a8b0kfvkb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.urbangoodz.vendor",
+            "certificate_hash": "f008c6ef2b29f8eb1dcbb383345babddf06afd17"
+          }
+        },
+        {
+          "client_id": "709013709032-eecou2jfnhud9ru12d5h1o193p31vm10.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJFYxphl_pVGs3J6j3WuNGQq1-QFwutyg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "709013709032-4r4i7ttpca314ak6i16fr8imdasgbm3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:709013709032:android:7adefca8df686f1e41a95d",
+        "android_client_info": {
+          "package_name": "com.urbangoodz.customer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "709013709032-eecou2jfnhud9ru12d5h1o193p31vm10.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJFYxphl_pVGs3J6j3WuNGQq1-QFwutyg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "709013709032-4r4i7ttpca314ak6i16fr8imdasgbm3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:709013709032:android:7ce2499c8a0a907241a95d",
+        "android_client_info": {
+          "package_name": "com.urbangoodz.driver"
+        }
+      },
+      "oauth_client": [
+        {
           "client_id": "709013709032-eecou2jfnhud9ru12d5h1o193p31vm10.apps.googleusercontent.com",
           "client_type": 3
         }

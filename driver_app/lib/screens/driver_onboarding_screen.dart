@@ -6,6 +6,7 @@ import 'package:urban_goodz_driver/services/api_client.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 import 'package:urban_goodz_driver/screens/driver_registration_screen.dart';
+import 'package:urban_goodz_driver/screens/dashboard_screen.dart';
 
 class DriverOnboardingScreen extends StatefulWidget {
   const DriverOnboardingScreen({super.key});
@@ -72,6 +73,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
       await authController.persistSession();
       authController.isLoggedIn.value = true;
+      Get.offAll(() => const DashboardScreen());
     } catch (e) {
       String msg = 'Login failed. Please check your credentials.';
       if (e is ApiException) {

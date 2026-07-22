@@ -10,7 +10,9 @@ import 'package:urban_goodz_vendor/services/vendor_api_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
   runApp(const MyApp());
 }
 

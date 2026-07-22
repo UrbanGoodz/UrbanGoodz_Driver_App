@@ -13,7 +13,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
-  } catch (_) {}
+  } catch (e, st) {
+    debugPrint('[Firebase] initializeApp FAILED: $e');
+    debugPrint('[Firebase] $st');
+  }
   runApp(const MyApp());
 }
 
