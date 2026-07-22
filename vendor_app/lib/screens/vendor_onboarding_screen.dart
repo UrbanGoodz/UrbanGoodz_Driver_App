@@ -183,6 +183,7 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                     // Brand Header
                     Semantics(
                       identifier: 'vendor_login_branding',
+                      label: 'vendor_login_branding',
                       container: true,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -483,29 +484,35 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
 
                                  const SizedBox(height: 14),
 
-                                 ElevatedButton(
-                                   key: const Key('vendor_login_submit'),
-                                   style: ElevatedButton.styleFrom(
-                                     backgroundColor: AppTheme.primary,
-                                     foregroundColor: AppTheme.white,
-                                     padding: const EdgeInsets.symmetric(vertical: 14),
-                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                 Semantics(
+                                   identifier: 'vendor_login_submit',
+                                   label: 'vendor_login_submit',
+                                   container: true,
+                                   button: true,
+                                   child: ElevatedButton(
+                                     key: const Key('vendor_login_submit'),
+                                     style: ElevatedButton.styleFrom(
+                                       backgroundColor: AppTheme.primary,
+                                       foregroundColor: AppTheme.white,
+                                       padding: const EdgeInsets.symmetric(vertical: 14),
+                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                     ),
+                                     onPressed: isLoading ? null : _loginWithPassword,
+                                     child: isLoading
+                                         ? const SizedBox(
+                                             height: 20,
+                                             width: 20,
+                                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                           )
+                                         : const Row(
+                                             mainAxisAlignment: MainAxisAlignment.center,
+                                             children: [
+                                               Text('Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                               SizedBox(width: 8),
+                                               Icon(Icons.arrow_forward_rounded, size: 20),
+                                             ],
+                                           ),
                                    ),
-                                   onPressed: isLoading ? null : _loginWithPassword,
-                                   child: isLoading
-                                       ? const SizedBox(
-                                           height: 20,
-                                           width: 20,
-                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                         )
-                                       : const Row(
-                                           mainAxisAlignment: MainAxisAlignment.center,
-                                           children: [
-                                             Text('Sign In', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                             SizedBox(width: 8),
-                                             Icon(Icons.arrow_forward_rounded, size: 20),
-                                           ],
-                                         ),
                                  ),
                                ] else ...[
                                  const Text(
