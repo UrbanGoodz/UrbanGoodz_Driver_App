@@ -107,7 +107,7 @@ class _VendorRegistrationScreenState extends State<VendorRegistrationScreen> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Create Vendor Account',
+                          'Register Vendor Store Account',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 22,

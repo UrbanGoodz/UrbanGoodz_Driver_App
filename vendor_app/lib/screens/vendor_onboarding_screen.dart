@@ -181,60 +181,64 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                 child: Column(
                   children: [
                     // Brand Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                    Semantics(
+                      identifier: 'vendor_login_branding',
+                      container: true,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'UG',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.dark,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'URBAN GOODZ',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.dark,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              Text(
+                                'Urban Goodz Vendor',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.primary,
+                                  letterSpacing: 1.5,
+                                ),
                               ),
                             ],
                           ),
-                          child: const Center(
-                            child: Text(
-                              'UG',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.dark,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Urban Goodz Vendor',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.dark,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            Text(
-                              'Vendor Login',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.primary,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 16),
@@ -446,21 +450,25 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                                    alignment: WrapAlignment.spaceBetween,
                                    crossAxisAlignment: WrapCrossAlignment.center,
                                    children: [
-                                     Row(
-                                       mainAxisSize: MainAxisSize.min,
-                                       children: [
-                                         SizedBox(
-                                           width: 24,
-                                           height: 24,
-                                           child: Checkbox(
-                                             value: rememberMe,
-                                             activeColor: AppTheme.primary,
-                                             onChanged: (val) => setState(() => rememberMe = val ?? true),
+                                     Semantics(
+                                       identifier: 'vendor_remember_me',
+                                       container: true,
+                                       child: Row(
+                                         mainAxisSize: MainAxisSize.min,
+                                         children: [
+                                           SizedBox(
+                                             width: 24,
+                                             height: 24,
+                                             child: Checkbox(
+                                               value: rememberMe,
+                                               activeColor: AppTheme.primary,
+                                               onChanged: (val) => setState(() => rememberMe = val ?? true),
+                                             ),
                                            ),
-                                         ),
-                                         const SizedBox(width: 4),
-                                         const Text('Remember me', style: TextStyle(fontSize: 12, color: AppTheme.dark)),
-                                       ],
+                                           const SizedBox(width: 4),
+                                           const Text('Remember me', style: TextStyle(fontSize: 12, color: AppTheme.dark)),
+                                         ],
+                                       ),
                                      ),
                                       Semantics(
                                         label: 'vendor_forgot_password',
