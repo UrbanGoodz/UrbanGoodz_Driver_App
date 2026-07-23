@@ -26,6 +26,63 @@ class VendorRepository {
 
   Future<void> logout() async => api.post('vendor/logout');
 
+  // ---------------------------------------------------------------------
+  // Password recovery.
+  //
+  // Contract read directly from the backend implementation at
+  // app/Http/Controllers/Api/V1/Auth/VendorPasswordResetController.php.
+  // Shapes are NOT inferred from the Admin panel web flow.
+  //
+  //   POST auth/vendor/forgot-password  {email}
+  //        200 {message}                       -> 6-digit code issued + mailed
+  //        404 {errors:[{code:'not-found'}]}   -> email unknown (see note)
+  //        403 {errors:[...]}                  -> validation, or mail send failed
+  //
+  //   POST auth/vendor/verify-token     {email, reset_token}
+  //        200 {message}                       -> code accepted
+  //        400 {errors:[{code:'reset_token'}]} -> invalid code
+  //        405 {errors:[{code:'otp_block_time'|'otp_temp_blocked'}]}
+  //        403 {errors:[...]}                  -> validation
+  //
+  //   PUT  auth/vendor/reset-password   {email, reset_token, password,
+  //                                      confirm_password}
+  //        200 {message}                       -> password changed
+  //        400 {errors:[{code:'invalid'}]}     -> bad or already-consumed code
+  //        401 {errors:[{code:'mismatch'}]}    -> confirmation mismatch
+  //        403 {errors:[...]}                  -> password rule violations
+  //
+  // Enumeration note: the backend discloses account existence via the 404 on
+  // forgot-password and via `exists:vendors,email` validation on the other
+  // two endpoints. That is backend-side and cannot be fixed from this app.
+  // VendorPasswordResetController (mobile) presents a single generic outcome
+  // so the client does not amplify the disclosure.
+
+  Future<void> requestPasswordReset(String email) async =>
+      api.post('auth/vendor/forgot-password', body: {'email': email});
+
+  Future<void> verifyPasswordResetToken({
+    required String email,
+    required String resetToken,
+  }) async => api.post(
+    'auth/vendor/verify-token',
+    body: {'email': email, 'reset_token': resetToken},
+  );
+
+  Future<void> submitPasswordReset({
+    required String email,
+    required String resetToken,
+    required String password,
+    required String confirmPassword,
+  }) async => api.put(
+    'auth/vendor/reset-password',
+    body: {
+      'email': email,
+      'reset_token': resetToken,
+      'password': password,
+      'confirm_password': confirmPassword,
+    },
+  );
+
   Future<List<Map<String, dynamic>>> currentOrders() async =>
       _list(await api.get('vendor/current-orders'));
 

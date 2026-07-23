@@ -4,6 +4,7 @@ import 'package:urban_goodz_vendor/controllers/vendor_auth_controller.dart';
 import 'package:urban_goodz_vendor/theme/app_theme.dart';
 import 'package:urban_goodz_vendor/screens/vendor_registration_screen.dart';
 import 'package:urban_goodz_vendor/screens/dashboard_screen.dart';
+import 'package:urban_goodz_vendor/screens/vendor_password_reset_screen.dart';
 
 class VendorOnboardingScreen extends StatefulWidget {
   const VendorOnboardingScreen({super.key});
@@ -52,6 +53,12 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
     super.dispose();
   }
 
+  /// Signs in against auth/vendor/login via VendorAuthController.
+  ///
+  /// This previously awaited a 700ms delay and then set `isLoggedIn = true`
+  /// and a hardcoded business name WITHOUT calling the API at all, so any
+  /// email/password pair opened the dashboard. It now performs the real
+  /// request and only navigates when the backend authenticates the vendor.
   Future<void> _loginWithPassword() async {
     if (!formKey.currentState!.validate()) return;
     setState(() {
@@ -59,14 +66,20 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
       errorMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 700));
-    final email = emailController.text.trim();
-    auth.email.value = email;
-    auth.businessName.value = 'Urban Goodz Merchant Store';
-    auth.isLoggedIn.value = true;
+    final succeeded = await auth.login(
+      emailController.text.trim(),
+      passwordController.text,
+    );
 
-    setState(() => isLoading = false);
-    Get.offAll(() => DashboardScreen());
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+      errorMessage = succeeded ? null : auth.errorMessage.value;
+    });
+
+    if (succeeded) {
+      Get.offAll(() => DashboardScreen());
+    }
   }
 
   Future<void> _handlePhoneOtpRequest() async {
@@ -108,59 +121,18 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
     Get.offAll(() => DashboardScreen());
   }
 
-  void _showForgotPasswordDialog() {
-    final resetController = TextEditingController(text: emailController.text);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.storefront_outlined, color: AppTheme.primary),
-            SizedBox(width: 8),
-            Text('Reset Store Password', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter your registered merchant email. We will send a password reset link.',
-              style: TextStyle(fontSize: 13, color: AppTheme.dark),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: resetController,
-              decoration: const InputDecoration(
-                hintText: 'store@urbangoodz.com',
-                prefixIcon: Icon(Icons.email_outlined, size: 20),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            key: const Key('vendor_forgot_password'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Get.snackbar(
-                'Reset Link Sent',
-                'Instructions sent to ${resetController.text}',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: AppTheme.dark,
-                colorText: Colors.white,
-              );
-            },
-            child: const Text('Send Reset Link'),
-          ),
-        ],
+  /// Opens the real password-recovery flow.
+  ///
+  /// This previously showed a dialog that made no API call and unconditionally
+  /// reported "Reset Link Sent", telling vendors an email was on its way when
+  /// nothing had been requested. It also promised a reset *link*; the backend
+  /// issues a 6-digit code. Replaced with the live flow against
+  /// auth/vendor/{forgot-password,verify-token,reset-password}.
+  void _openPasswordRecovery() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            VendorPasswordResetScreen(initialEmail: emailController.text),
       ),
     );
   }
@@ -475,7 +447,7 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                                         label: 'vendor_forgot_password',
                                         child: TextButton(
                                           key: const Key('vendor_forgot_password'),
-                                          onPressed: _showForgotPasswordDialog,
+                                          onPressed: _openPasswordRecovery,
                                           child: const Text('Forgot Password?', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.bold)),
                                         ),
                                       ),

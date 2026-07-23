@@ -68,21 +68,71 @@ including this one — as needing that second pass.
 
 ### P1 — Login, OTP, forgot password, account state
 
+> **CORRECTION (this pass).** The row below previously read
+> "Login — **IMPLEMENTED**". That was wrong, and it was wrong because I
+> classified it from the repository and controller layers without tracing the
+> screen. `_loginWithPassword()` in `vendor_onboarding_screen.dart` awaited a
+> 700 ms delay and then set `auth.isLoggedIn.value = true` with a hardcoded
+> business name **without calling the API at all** — any email/password pair
+> opened the dashboard. This is exactly the failure the
+> screen → control → request → response → visible result chain exists to
+> catch. Fixed in this commit; the screen now calls `auth.login()` and only
+> navigates when the backend authenticates.
+
 | Capability | Mobile | Backend | Status |
 |---|---|---|---|
-| Login | `auth/vendor/login` | `VendorLoginController@login` | **IMPLEMENTED** (paths match) |
+| Login | `auth/vendor/login` | `VendorLoginController@login` | **IMPLEMENTED** — screen now calls `auth.login()` (was a mock; see correction above) |
 | Register | `auth/vendor/register` | `VendorLoginController@register` | **IMPLEMENTED** |
 | Logout | `vendor/logout` | present | **IMPLEMENTED** |
 | Session restore | `_restoreSession()` + token store | n/a | **IMPLEMENTED** |
-| **Forgot password** | **none** | `POST auth/vendor/forgot-password` | **BACKEND ONLY** |
-| **Verify reset token** | **none** | `POST auth/vendor/verify-token` | **BACKEND ONLY** |
-| **Reset password** | **none** | `PUT auth/vendor/reset-password` | **BACKEND ONLY** |
+| Forgot password | `auth/vendor/forgot-password` | `reset_password_request` | **IMPLEMENTED** (source + analyze; live reset not executed) |
+| Verify reset token | `auth/vendor/verify-token` | `verify_token` | **IMPLEMENTED** (source + analyze; live reset not executed) |
+| Reset password | `auth/vendor/reset-password` | `reset_password_submit` | **IMPLEMENTED** (source + analyze; live reset not executed) |
+| **Phone OTP login** | fake — no API call | **no verified contract** | **BROKEN / BLOCKED** (see below) |
 | **Order OTP** | **none** | `PUT vendor/send-order-otp` | **BACKEND ONLY** |
 | Login *screen* | no dedicated file | n/a | **PARTIAL** — logic exists in `vendor_auth_controller.login()`; entry point is `vendor_onboarding_screen`, not a discrete login screen |
 
-**This is the highest-value P0 gap.** A vendor who forgets their password has
-no in-app path to recover it, while three proven backend endpoints sit unused.
-It is implementable purely in the mobile app — no backend invention required.
+**Password recovery is now implemented** (`vendor_password_reset_controller.dart`,
+`vendor_password_reset_screen.dart`, three repository methods, 17 focused
+tests). It replaced a dialog that made **no API call** and unconditionally
+showed "Reset Link Sent — Instructions sent to <email>", telling vendors mail
+was on its way when nothing had been requested; it also promised a *link*
+where the backend issues a 6-digit code.
+
+### Still BROKEN: phone-OTP login
+
+`_handlePhoneOtpRequest()` and `_handleOtpVerification()` in
+`vendor_onboarding_screen.dart` are still mocks — fixed delays, then
+`isLoggedIn = true` with a hardcoded `vendor@urbangoodz.com`. **Any code of 4+
+characters signs a user in.**
+
+This was NOT fixed here because no verified backend contract exists for vendor
+phone-OTP login. `routes/api/v1/api.php` exposes only email/password under
+`auth/vendor`; `vendor/send-order-taken-otp` is order-related, not auth.
+Inventing an endpoint would violate the standing constraint, so it is recorded
+as **BLOCKED pending a backend contract** rather than fabricated.
+
+**Operational risk:** until that path is fixed or hidden, the phone tab is an
+authentication bypass in the UI. API calls will still 401 without a real
+token, but the dashboard renders. Recommend hiding the phone tab until a
+contract exists.
+
+### Account-enumeration disclosure (backend, not fixable here)
+
+`reset_password_request` returns **404 `Email not found!`** for unknown
+addresses, and `verify_token` / `reset_password_submit` use
+`exists:vendors,email` validation, which also discloses existence. The mobile
+client deliberately presents one generic outcome for 200 and 404 so it does
+not amplify this, but **the backend still leaks account existence** to any
+direct API caller. Fixing it requires an Admin-repo change, which is out of
+scope for this lane.
+
+### Token expiry
+
+`reset_password_submit` does **not** check the age of the `password_resets`
+row. Codes therefore do not expire at submission time; `created_at` only feeds
+OTP hit-count throttling (5 attempts / 60 s, 600 s temp block). Recorded as
+observed behaviour, not endorsed.
 
 ### P2 — Registration and Admin approval lifecycle
 `auth/vendor/register` wired; `vendor_registration_screen` present.
