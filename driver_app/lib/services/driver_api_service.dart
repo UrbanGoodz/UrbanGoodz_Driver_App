@@ -9,23 +9,33 @@ import 'package:urban_goodz_driver/models/notification_model.dart';
 /// Real driver API integration for the Session 2 endpoint groups.
 /// All calls require the token (injected by ApiClient as ?token= query param).
 class DriverApiService extends GetxService {
-  final ApiClient _client = Get.find<ApiClient>();
+  DriverApiService({ApiClient? client}) : _injectedClient = client;
+
+  final ApiClient? _injectedClient;
+
+  /// Resolved lazily so tests can construct the service without a populated
+  /// GetX container.
+  ApiClient get _client => _injectedClient ?? Get.find<ApiClient>();
 
   Future<dynamic> _ok(Response res) async {
     final code = res.statusCode ?? 0;
     if (code >= 200 && code < 300) return res.body;
-    final body = res.body;
-    final msg = body is Map && body['message'] != null
-        ? body['message'].toString()
-        : 'Request failed (HTTP $code)';
-    final errors = body is Map
-        ? (body['errors'] as Map<String, dynamic>?)
-        : null;
-    throw ApiException(code, msg, errors);
+    throw ApiException.fromResponse(res);
   }
 
   // ---------- Auth ----------
 
+  /// POST /api/v1/auth/delivery-man/login  (verified live 2026-07-23)
+  ///
+  /// Request : {"phone": <phone or email>, "password": <string>}
+  /// 200     : session payload containing the `token` used as `?token=`
+  /// 401     : {"errors":[{"code":"auth-001","message":"Incorrect credential
+  ///           please try again"}]} — also the envelope the backend uses to
+  ///           report a not-yet-approved / suspended account, so the server's
+  ///           message is surfaced verbatim rather than second-guessed here.
+  /// 403     : per-field validation errors
+  /// 429     : {"message":"Too Many Attempts."} after 5 attempts, with a
+  ///           `retry-after` header (observed: 22s).
   Future<Map<String, dynamic>> login(String phone, String password) async {
     final res = await _client.post(ApiConfig.driverLogin, {
       'phone': phone,
@@ -580,28 +590,41 @@ class DriverApiService extends GetxService {
 
   Future<List<dynamic>> getAssignedRoutes() async {
     final body = await _ok(await _client.authGet(ApiConfig.assignedRoutes));
-    return (body is Map && body['routes'] is List) ? body['routes'] as List : [];
+    return (body is Map && body['routes'] is List)
+        ? body['routes'] as List
+        : [];
   }
 
   Future<Map<String, dynamic>> getRouteDetail(int routeId) async {
-    final body = await _ok(await _client.authGet(ApiConfig.routeDetail(routeId)));
+    final body = await _ok(
+      await _client.authGet(ApiConfig.routeDetail(routeId)),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
-  Future<Map<String, dynamic>> resequenceRoute(int routeId, String endpointType) async {
+  Future<Map<String, dynamic>> resequenceRoute(
+    int routeId,
+    String endpointType,
+  ) async {
     final body = await _ok(
-      await _client.authPost(ApiConfig.resequenceRoute(routeId), {'endpoint_type': endpointType}),
+      await _client.authPost(ApiConfig.resequenceRoute(routeId), {
+        'endpoint_type': endpointType,
+      }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
   Future<Map<String, dynamic>> startRoute(int routeId) async {
-    final body = await _ok(await _client.authPost(ApiConfig.routeStarted(routeId), {}));
+    final body = await _ok(
+      await _client.authPost(ApiConfig.routeStarted(routeId), {}),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
   Future<Map<String, dynamic>> completeRoute(int routeId) async {
-    final body = await _ok(await _client.authPost(ApiConfig.routeCompleted(routeId), {}));
+    final body = await _ok(
+      await _client.authPost(ApiConfig.routeCompleted(routeId), {}),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
@@ -662,45 +685,71 @@ class DriverApiService extends GetxService {
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
-  Future<Map<String, dynamic>> getAiRouteOptimization(int routeId, {String? preference}) async {
-    final body = await _ok(await _client.authPost(ApiConfig.aiRouteOptimization, {
-      'route_id': routeId,
-      if (preference != null) 'preference': preference,
-    }));
+  Future<Map<String, dynamic>> getAiRouteOptimization(
+    int routeId, {
+    String? preference,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.aiRouteOptimization, {
+        'route_id': routeId,
+        if (preference != null) 'preference': preference,
+      }),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
-  Future<Map<String, dynamic>> verifyPackageAi(int packageId, String photoBase64, double lat, double lng) async {
-    final body = await _ok(await _client.authPost(ApiConfig.aiVerifyPackage, {
-      'package_id': packageId,
-      'photo': photoBase64,
-      'gps_lat': lat,
-      'gps_lng': lng,
-    }));
+  Future<Map<String, dynamic>> verifyPackageAi(
+    int packageId,
+    String photoBase64,
+    double lat,
+    double lng,
+  ) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.aiVerifyPackage, {
+        'package_id': packageId,
+        'photo': photoBase64,
+        'gps_lat': lat,
+        'gps_lng': lng,
+      }),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
-  Future<Map<String, dynamic>> verifyDeliveryAi(int packageId, String photoBase64, double lat, double lng, {String? recipientName, String? dropoffInstructions}) async {
-    final body = await _ok(await _client.authPost(ApiConfig.aiVerifyDelivery, {
-      'package_id': packageId,
-      'photo': photoBase64,
-      'gps_lat': lat,
-      'gps_lng': lng,
-      if (recipientName != null) 'recipient_name': recipientName,
-      if (dropoffInstructions != null) 'dropoff_instructions': dropoffInstructions,
-    }));
+  Future<Map<String, dynamic>> verifyDeliveryAi(
+    int packageId,
+    String photoBase64,
+    double lat,
+    double lng, {
+    String? recipientName,
+    String? dropoffInstructions,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.aiVerifyDelivery, {
+        'package_id': packageId,
+        'photo': photoBase64,
+        'gps_lat': lat,
+        'gps_lng': lng,
+        if (recipientName != null) 'recipient_name': recipientName,
+        if (dropoffInstructions != null)
+          'dropoff_instructions': dropoffInstructions,
+      }),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
   Future<Map<String, dynamic>> getAiLoadRecommendations() async {
-    final body = await _ok(await _client.authPost(ApiConfig.aiLoadRecommendations, {}));
+    final body = await _ok(
+      await _client.authPost(ApiConfig.aiLoadRecommendations, {}),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
   Future<Map<String, dynamic>> getAiEarningsComparison({String? period}) async {
-    final body = await _ok(await _client.authPost(ApiConfig.aiEarningsComparison, {
-      if (period != null) 'period': period,
-    }));
+    final body = await _ok(
+      await _client.authPost(ApiConfig.aiEarningsComparison, {
+        if (period != null) 'period': period,
+      }),
+    );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 }

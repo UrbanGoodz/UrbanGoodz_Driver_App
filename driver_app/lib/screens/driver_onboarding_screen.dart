@@ -19,17 +19,34 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   final DriverAuthController authController = Get.find<DriverAuthController>();
 
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _otpController = TextEditingController();
 
-  bool _isPhoneMode = true;
-  bool _otpSent = false;
+  /// The backend's login route takes a single `phone` field and matches it
+  /// against the driver's registered phone or email, so one input serves both.
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
+
   bool _isLoading = false;
   bool _rememberMe = true;
   bool _obscurePassword = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Explain why a signed-in driver is looking at the login screen again.
+    final notice = authController.sessionExpiredNotice.value;
+    if (notice.isNotEmpty) {
+      _error = notice;
+      authController.sessionExpiredNotice.value = '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _identifierController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   final List<String> _driverWorkstreams = const [
     'Marketplace Delivery',
@@ -42,75 +59,38 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     'Enterprise Logistics',
   ];
 
-  Future<void> _handlePhoneOtpRequest() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty || phone.length < 7) {
-      setState(() => _error = 'Please enter a valid phone number');
-      return;
+  // Phone/OTP sign-in was removed rather than merely disabled. Live probes
+  // against admin.urbangoodzdelivery.com/api/v1 on 2026-07-23 found no
+  // auth/delivery-man/otp, auth/delivery-man/verify-otp or auth/send-otp route
+  // — all return the unregistered-route signature (HTTP 405 "Supported
+  // methods: GET, HEAD") while real routes return 401. The old implementation
+  // faked "OTP sent" with a timer, then logged in with a hardcoded password
+  // ('testpassword123') and, on an unexpected response, fell back to a bogus
+  // 'demo_driver_token_verified' session token — a login bypass that produced
+  // a "signed in" app holding a token the backend would reject on every call.
+  // A tab that can never succeed is worse than no tab, so it is gone until a
+  // real OTP contract exists (see BACKEND_CONTRACTS.md).
+
+  /// Turns a backend rejection into something a driver can act on.
+  ///
+  /// Verified envelopes: 401 `auth-001` for bad credentials, 403 with
+  /// per-field codes for validation, 429 + `retry-after` for the 5-attempt
+  /// throttle. Any other code surfaces the server's own message verbatim —
+  /// account states such as pending approval, rejection and suspension are
+  /// reported by the backend through this same `errors` array, and inventing
+  /// local text for them would risk telling a driver something untrue.
+  String _describe(ApiException e) {
+    if (e.isRateLimited) {
+      final wait = e.retryAfterSeconds;
+      return wait != null
+          ? 'Too many sign-in attempts. Please wait $wait seconds and try again.'
+          : 'Too many sign-in attempts. Please wait a minute and try again.';
     }
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 900));
-    setState(() {
-      _isLoading = false;
-      _otpSent = true;
-    });
-  }
-
-  Future<void> _handleOtpVerification() async {
-    final code = _otpController.text.trim();
-    if (code.length < 4) {
-      setState(() => _error = 'Please enter the full verification code');
-      return;
+    if (e.code == 'auth-001') {
+      return 'Incorrect phone/email or password. Please try again.';
     }
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final service = Get.find<DriverApiService>();
-      // Attempt login with phone number or demo credentials
-      final phone = _phoneController.text.trim();
-      final result = await service.login(phone, 'testpassword123');
-
-      final token = result['token']?.toString() ?? 'demo_driver_token_verified';
-      authController.setToken(token);
-
-      try {
-        final profile = await service.getProfile();
-        authController.name.value =
-            profile['first_name']?.toString() ??
-            profile['f_name']?.toString() ??
-            'Urban Goodz Driver';
-        authController.phone.value = phone;
-      } catch (_) {
-        authController.name.value = 'Urban Goodz Driver';
-        authController.phone.value = phone;
-      }
-
-      try {
-        final fcmToken = await FirebaseMessaging.instance.getToken();
-        if (fcmToken != null && fcmToken.isNotEmpty) {
-          await service.updateFcmToken(fcmToken);
-        }
-      } catch (_) {}
-
-      await authController.persistSession();
-      authController.isLoggedIn.value = true;
-      Get.offAll(() => const DashboardScreen());
-    } catch (e) {
-      String msg = 'OTP Verification failed. Please retry.';
-      if (e is ApiException) msg = e.message;
-      setState(() {
-        _isLoading = false;
-        _error = msg;
-      });
-    }
+    if (e.message.isNotEmpty) return e.message;
+    return 'Sign in failed (HTTP ${e.statusCode}). Please try again.';
   }
 
   Future<void> _loginWithPassword() async {
@@ -120,38 +100,49 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       _error = null;
     });
 
+    final service = Get.find<DriverApiService>();
+    final identifier = _identifierController.text.trim();
+
     try {
-      final service = Get.find<DriverApiService>();
-      final identifier = _emailController.text.trim().isNotEmpty
-          ? _emailController.text.trim()
-          : _phoneController.text.trim();
-      final result = await service.login(
-        identifier,
-        _passwordController.text,
-      );
+      final result = await service.login(identifier, _passwordController.text);
 
       final token = result['token']?.toString() ?? '';
       if (token.isEmpty) {
         setState(() {
           _isLoading = false;
-          _error = 'Login succeeded but no active session token returned.';
+          _error =
+              'Sign in did not return a session token. Please contact support.';
         });
         return;
       }
 
       authController.setToken(token);
 
+      // Validate the brand-new token immediately. If the profile call is
+      // rejected the credentials were fine but the account cannot be used, and
+      // the driver must not be dropped onto an empty dashboard.
       try {
         final profile = await service.getProfile();
-        authController.name.value =
-            profile['first_name']?.toString() ??
-            profile['f_name']?.toString() ??
-            'Driver';
-        authController.phone.value = profile['phone']?.toString() ?? identifier;
-        authController.email.value = profile['email']?.toString() ?? '';
-        authController.driverId.value =
-            int.tryParse(profile['id']?.toString() ?? '') ?? 0;
-      } catch (_) {}
+        authController.applyProfile(profile);
+      } on ApiException catch (e) {
+        if (e.isUnauthorized) {
+          authController.clearToken();
+          setState(() {
+            _isLoading = false;
+            _error = e.message.isNotEmpty
+                ? e.message
+                : 'Your driver account is not active yet. Please contact support.';
+          });
+          return;
+        }
+        // Reachable but erroring: keep the session, dashboard will retry.
+      } catch (_) {
+        // Offline right after login: keep the session and continue.
+      }
+
+      if (authController.phone.value.isEmpty) {
+        authController.phone.value = identifier;
+      }
 
       try {
         final fcmToken = await FirebaseMessaging.instance.getToken();
@@ -160,21 +151,30 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         }
       } catch (_) {}
 
-      await authController.persistSession();
+      if (_rememberMe) {
+        await authController.persistSession();
+      }
       authController.isLoggedIn.value = true;
       Get.offAll(() => const DashboardScreen());
-    } catch (e) {
-      String msg = 'Authentication failed. Please verify credentials.';
-      if (e is ApiException) msg = e.message;
+    } on ApiException catch (e) {
       setState(() {
         _isLoading = false;
-        _error = msg;
+        _error = _describe(e);
+      });
+    } catch (_) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Unable to reach Urban Goodz. Check your connection.';
       });
     }
   }
 
+  /// Password reset has no backend route on this platform (the same 405 probe
+  /// that ruled out the OTP endpoints). The previous dialog collected a phone
+  /// number, called nothing, and showed "Reset Code Sent" — a driver locked out
+  /// of their account would wait indefinitely for a message that was never
+  /// sent. Until a reset contract exists, tell them how to actually get back in.
   void _showForgotPasswordDialog() {
-    final resetController = TextEditingController(text: _phoneController.text);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -184,46 +184,25 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           children: [
             Icon(Icons.lock_reset, color: AppTheme.primary),
             SizedBox(width: 8),
-            Text('Reset Driver Password', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter your registered phone number or email address. We will send an OTP reset code.',
-              style: TextStyle(fontSize: 13, color: AppTheme.dark),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: resetController,
-              decoration: const InputDecoration(
-                hintText: 'Phone number or Email',
-                prefixIcon: Icon(Icons.contact_mail_outlined, size: 20),
+            Expanded(
+              child: Text(
+                'Reset Driver Password',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ],
         ),
+        content: const Text(
+          'Self-service password reset is not available yet.\n\n'
+          'Contact Urban Goodz driver support and an operator will reset your '
+          'password on the dispatch console.',
+          style: TextStyle(fontSize: 13, color: AppTheme.dark, height: 1.4),
+        ),
         actions: [
           TextButton(
+            key: const Key('driver_forgot_password_close'),
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            key: const Key('driver_forgot_password'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Get.snackbar(
-                'Reset Code Sent',
-                'Instructions sent to ${resetController.text}',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: AppTheme.dark,
-                colorText: Colors.white,
-              );
-            },
-            child: const Text('Send Reset Link'),
+            child: const Text('Close', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
@@ -240,7 +219,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 20.0,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
@@ -276,34 +258,41 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              label: 'driver_brand_title',
-                              child: Text(
-                                'URBAN GOODZ',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.dark,
-                                  letterSpacing: -0.3,
+                        // Flexible so the wordmark shrinks rather than
+                        // overflowing on narrow phones and at large text
+                        // scales — the subtitle is wide (24 characters with
+                        // 1.8px letter spacing).
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Semantics(
+                                label: 'driver_brand_title',
+                                child: Text(
+                                  'URBAN GOODZ',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.dark,
+                                    letterSpacing: -0.3,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Semantics(
-                              label: 'driver_brand_subtitle',
-                              child: Text(
-                                'DRIVER PARTNER LOGISTICS',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.primary,
-                                  letterSpacing: 1.8,
+                              Semantics(
+                                label: 'driver_brand_subtitle',
+                                child: Text(
+                                  'DRIVER PARTNER LOGISTICS',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.primary,
+                                    letterSpacing: 1.8,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -319,15 +308,24 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                         separatorBuilder: (_, __) => const SizedBox(width: 8),
                         itemBuilder: (ctx, idx) {
                           return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.85),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+                              border: Border.all(
+                                color: AppTheme.primary.withOpacity(0.3),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.check_circle, size: 14, color: AppTheme.primary),
+                                const Icon(
+                                  Icons.check_circle,
+                                  size: 14,
+                                  color: AppTheme.primary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   _driverWorkstreams[idx],
@@ -361,83 +359,6 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Auth Mode Toggle (Phone OTP vs Password)
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: AppTheme.beige.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.all(4),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Semantics(
-                                        label: 'driver_phone_tab',
-                                        button: true,
-                                        child: GestureDetector(
-                                          onTap: () => setState(() {
-                                            _isPhoneMode = true;
-                                            _error = null;
-                                          }),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: _isPhoneMode ? Colors.white : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(10),
-                                              boxShadow: _isPhoneMode
-                                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
-                                                  : null,
-                                            ),
-                                            child: const Center(
-                                              child: Text(
-                                                'Phone OTP',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.dark,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Semantics(
-                                        label: 'driver_email_tab',
-                                        button: true,
-                                        child: GestureDetector(
-                                          onTap: () => setState(() {
-                                            _isPhoneMode = false;
-                                            _error = null;
-                                          }),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: !_isPhoneMode ? Colors.white : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(10),
-                                              boxShadow: !_isPhoneMode
-                                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)]
-                                                  : null,
-                                            ),
-                                            child: const Center(
-                                              child: Text(
-                                                'Email / Password',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.dark,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
                               const SizedBox(height: 20),
 
                               // Error Alert Banner
@@ -451,16 +372,26 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                     decoration: BoxDecoration(
                                       color: Colors.red.withOpacity(0.08),
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                                      border: Border.all(
+                                        color: Colors.red.withOpacity(0.3),
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                                        const Icon(
+                                          Icons.error_outline,
+                                          color: Colors.red,
+                                          size: 20,
+                                        ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Text(
                                             _error!,
-                                            style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -468,186 +399,106 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                   ),
                                 ),
 
-                              if (_isPhoneMode) ...[
-                                // Phone Number Entry
-                                const Text(
-                                  'Mobile Phone Number',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.dark,
-                                  ),
+                              // Phone or email + password — the only sign-in
+                              // path the backend actually implements.
+                              const Text(
+                                'Phone Number or Email',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.dark,
                                 ),
-                                const SizedBox(height: 6),
-                                Semantics(
-                                  label: 'driver_login_phone',
-                                  child: TextFormField(
-                                    key: const Key('driver_login_phone'),
-                                    controller: _phoneController,
-                                    keyboardType: TextInputType.phone,
-                                    decoration: const InputDecoration(
-                                      hintText: '+1 (555) 019-2834',
-                                      prefixIcon: Icon(Icons.phone_android_outlined, size: 20, color: AppTheme.primary),
-                                      border: OutlineInputBorder(),
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              ),
+                              const SizedBox(height: 6),
+                              Semantics(
+                                label: 'driver_login_identifier',
+                                child: TextFormField(
+                                  key: const Key('driver_login_identifier'),
+                                  controller: _identifierController,
+                                  keyboardType: TextInputType.text,
+                                  autofillHints: const [AutofillHints.username],
+                                  decoration: const InputDecoration(
+                                    hintText:
+                                        '+1 555 019 2834  or  driver@urbangoodz.com',
+                                    prefixIcon: Icon(
+                                      Icons.person_outline,
+                                      size: 20,
+                                      color: AppTheme.primary,
                                     ),
-                                    validator: (val) => val == null || val.trim().isEmpty ? 'Phone number required' : null,
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
+                                    ),
                                   ),
+                                  validator: (val) =>
+                                      val == null || val.trim().isEmpty
+                                      ? 'Phone number or email required'
+                                      : null,
                                 ),
+                              ),
 
-                                const SizedBox(height: 16),
+                              const SizedBox(height: 14),
 
-                                if (!_otpSent)
-                                  ElevatedButton(
-                                    key: const Key('driver_otp_request'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: AppTheme.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              const Text(
+                                'Password',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.dark,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Semantics(
+                                label: 'driver_login_password',
+                                child: TextFormField(
+                                  key: const Key('driver_login_password'),
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter password',
+                                    prefixIcon: const Icon(
+                                      Icons.lock_outline,
+                                      size: 20,
+                                      color: AppTheme.primary,
                                     ),
-                                    onPressed: _isLoading ? null : _handlePhoneOtpRequest,
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                          )
-                                        : const Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Text('Send Verification Code', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                              SizedBox(width: 8),
-                                              Icon(Icons.sms_outlined, size: 20),
-                                            ],
-                                          ),
-                                  )
-                                else ...[
-                                  // OTP Verification Code Entry
-                                  const Text(
-                                    'Enter 6-Digit OTP Code',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.dark,
+                                    border: const OutlineInputBorder(),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Semantics(
-                                    label: 'driver_otp_code',
-                                    child: TextFormField(
-                                      key: const Key('driver_otp_code'),
-                                      controller: _otpController,
-                                      keyboardType: TextInputType.number,
-                                      maxLength: 6,
-                                      style: const TextStyle(fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.bold),
-                                      textAlign: TextAlign.center,
-                                      decoration: const InputDecoration(
-                                        hintText: '123456',
-                                        counterText: '',
-                                        border: OutlineInputBorder(),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePassword =
+                                            !_obscurePassword,
                                       ),
                                     ),
                                   ),
-
-                                  const SizedBox(height: 16),
-
-                                  ElevatedButton(
-                                    key: const Key('driver_otp_verify'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: AppTheme.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    onPressed: _isLoading ? null : _handleOtpVerification,
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                          )
-                                        : const Text('Verify & Enter Dashboard', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                  ),
-
-                                  const SizedBox(height: 10),
-
-                                  Center(
-                                    child: TextButton(
-                                      key: const Key('driver_otp_resend'),
-                                      onPressed: _handlePhoneOtpRequest,
-                                      child: const Text('Resend OTP Code', style: TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ),
-                                ],
-                              ] else ...[
-                                // Email & Password Entry
-                                const Text(
-                                  'Email Address / Driver ID',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.dark,
-                                  ),
+                                  validator: (val) =>
+                                      val == null || val.length < 6
+                                      ? 'Minimum 6 characters required'
+                                      : null,
                                 ),
-                                const SizedBox(height: 6),
-                                Semantics(
-                                  label: 'driver_login_email',
-                                  child: TextFormField(
-                                    key: const Key('driver_login_email'),
-                                    controller: _emailController,
-                                    keyboardType: TextInputType.emailAddress,
-                                    decoration: const InputDecoration(
-                                      hintText: 'driver@urbangoodz.com',
-                                      prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppTheme.primary),
-                                      border: OutlineInputBorder(),
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    ),
-                                    validator: (val) => val == null || val.trim().isEmpty ? 'Email required' : null,
-                                  ),
-                                ),
+                              ),
 
-                                const SizedBox(height: 14),
+                              const SizedBox(height: 8),
 
-                                const Text(
-                                  'Password',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.dark,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Semantics(
-                                  label: 'driver_login_password',
-                                  child: TextFormField(
-                                    key: const Key('driver_login_password'),
-                                    controller: _passwordController,
-                                    obscureText: _obscurePassword,
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter password',
-                                      prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
-                                      border: const OutlineInputBorder(),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                          size: 20,
-                                        ),
-                                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                                      ),
-                                    ),
-                                    validator: (val) => val == null || val.length < 6 ? 'Minimum 6 characters required' : null,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 8),
-
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Flexible so the row degrades gracefully on
+                                  // narrow phones and at large text scales
+                                  // instead of overflowing.
+                                  Flexible(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         SizedBox(
                                           width: 24,
@@ -655,48 +506,84 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                           child: Checkbox(
                                             value: _rememberMe,
                                             activeColor: AppTheme.primary,
-                                            onChanged: (val) => setState(() => _rememberMe = val ?? true),
+                                            onChanged: (val) => setState(
+                                              () => _rememberMe = val ?? true,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        const Text('Remember me', style: TextStyle(fontSize: 13, color: AppTheme.dark)),
+                                        const Flexible(
+                                          child: Text(
+                                            'Remember me',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: AppTheme.dark,
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                    TextButton(
-                                      key: const Key('driver_forgot_password'),
-                                      onPressed: _showForgotPasswordDialog,
-                                      child: const Text('Forgot Password?', style: TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 14),
-
-                                ElevatedButton(
-                                  key: const Key('driver_login_submit'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primary,
-                                    foregroundColor: AppTheme.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
-                                  onPressed: _isLoading ? null : _loginWithPassword,
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                        )
-                                      : const Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                            SizedBox(width: 8),
-                                            Icon(Icons.arrow_forward_rounded, size: 20),
-                                          ],
-                                        ),
+                                  TextButton(
+                                    key: const Key('driver_forgot_password'),
+                                    onPressed: _showForgotPasswordDialog,
+                                    child: const Text(
+                                      'Forgot Password?',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: AppTheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 14),
+
+                              ElevatedButton(
+                                key: const Key('driver_login_submit'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: AppTheme.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
-                              ],
+                                onPressed: _isLoading
+                                    ? null
+                                    : _loginWithPassword,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Sign In',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ),
+                              ),
 
                               const SizedBox(height: 16),
 
@@ -704,8 +591,17 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                 children: [
                                   const Expanded(child: Divider()),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: Text('OR', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    child: Text(
+                                      'OR',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                   const Expanded(child: Divider()),
                                 ],
@@ -717,15 +613,32 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                 key: const Key('driver_create_account'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.dark,
-                                  side: const BorderSide(color: AppTheme.primary, width: 1.5),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  side: const BorderSide(
+                                    color: AppTheme.primary,
+                                    width: 1.5,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
-                                onPressed: () => Get.to(() => const DriverRegistrationScreen()),
-                                icon: const Icon(Icons.person_add_outlined, size: 20, color: AppTheme.dark),
+                                onPressed: () => Get.to(
+                                  () => const DriverRegistrationScreen(),
+                                ),
+                                icon: const Icon(
+                                  Icons.person_add_outlined,
+                                  size: 20,
+                                  color: AppTheme.dark,
+                                ),
                                 label: const Text(
                                   'Apply as New Driver',
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.dark),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.dark,
+                                  ),
                                 ),
                               ),
                             ],
@@ -739,7 +652,11 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                     const Text(
                       '© 2026 Urban Goodz Platform. All rights reserved.\nEqual Opportunity Driver Partner Network',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.black54,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
