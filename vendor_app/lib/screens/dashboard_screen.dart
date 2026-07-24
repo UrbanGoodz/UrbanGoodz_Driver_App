@@ -275,61 +275,78 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               height: 140,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(c.revenueChart.length, (i) {
-                  final maxVal = c.revenueChart.reduce((a, b) => a > b ? a : b);
-                  final height = (c.revenueChart[i] / maxVal) * 120;
-                  final days = [
-                    'Mon',
-                    'Tue',
-                    'Wed',
-                    'Thu',
-                    'Fri',
-                    'Sat',
-                    'Sun',
-                  ];
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '\$${(c.revenueChart[i] / 1000).toStringAsFixed(1)}k',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: AppTheme.dark,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: height.clamp(8.0, 120.0),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withOpacity(0.8),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            days[i],
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: AppTheme.dark,
-                            ),
-                          ),
-                        ],
+              child: c.hasNoRevenue
+                  // An empty state, not a row of invisible bars: no day has
+                  // revenue, so there is nothing to scale against.
+                  ? Center(
+                      key: const Key('revenue_chart_empty'),
+                      child: Text(
+                        'No revenue recorded in the last 7 days',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.dark.withOpacity(0.6),
+                        ),
                       ),
-                    ),
-                  );
-                }),
-              ),
+                    )
+                  : _buildRevenueBars(c.revenueChart),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Draws one bar per day, sized by [DashboardController.barFractions].
+  ///
+  /// The bar takes a fraction of the space `Expanded` leaves between the two
+  /// labels, so it cannot be NaN, infinite, or taller than the row - whatever
+  /// the labels measure.
+  Widget _buildRevenueBars(List<double> revenue) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final fractions = DashboardController.barFractions(revenue);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(revenue.length, (i) {
+        final value = revenue[i];
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Column(
+              children: [
+                Text(
+                  value.isFinite
+                      ? '\$${(value / 1000).toStringAsFixed(1)}k'
+                      : '--',
+                  style: const TextStyle(fontSize: 9, color: AppTheme.dark),
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: FractionallySizedBox(
+                    alignment: Alignment.bottomCenter,
+                    heightFactor: fractions[i],
+                    child: Container(
+                      key: Key('revenue_bar_$i'),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withOpacity(0.8),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  // The series is not guaranteed to be exactly 7 long.
+                  i < days.length ? days[i] : '',
+                  style: const TextStyle(fontSize: 9, color: AppTheme.dark),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
     );
   }
 
