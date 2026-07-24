@@ -13,6 +13,14 @@ class VendorOnboardingScreen extends StatefulWidget {
   State<VendorOnboardingScreen> createState() => _VendorOnboardingScreenState();
 }
 
+/// Phone-OTP sign-in is off until a real backend contract exists.
+///
+/// The previous implementation authenticated locally without any API call.
+/// Flipping this to `true` re-exposes the tab, so it must not be flipped
+/// until `_handlePhoneOtpRequest`/`_handleOtpVerification` call a verified
+/// endpoint.
+const bool phoneOtpLoginEnabled = false;
+
 class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
   final VendorAuthController auth = Get.find<VendorAuthController>();
   final formKey = GlobalKey<FormState>();
@@ -82,43 +90,28 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
     }
   }
 
-  Future<void> _handlePhoneOtpRequest() async {
-    final phone = phoneController.text.trim();
-    if (phone.isEmpty || phone.length < 7) {
-      setState(() => errorMessage = 'Please enter a valid phone number');
-      return;
-    }
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
+  // Phone-OTP handlers are intentionally inert.
+  //
+  // They previously performed local-only authentication: a fixed delay, then
+  // isLoggedIn = true with a hardcoded vendor@urbangoodz.com identity and no
+  // API call whatsoever. The bodies are removed rather than left dormant so
+  // the bypass cannot return by simply flipping `phoneOtpLoginEnabled`.
+  //
+  // Required before this can be implemented: a verified vendor phone-OTP
+  // request/verify contract in routes/api/v1/api.php. None exists today.
 
-    await Future.delayed(const Duration(milliseconds: 800));
-    setState(() {
-      isLoading = false;
-      otpSent = true;
-    });
+  Future<void> _handlePhoneOtpRequest() async {
+    setState(
+      () => errorMessage =
+          'Phone sign-in is not available yet. Use your email and password.',
+    );
   }
 
   Future<void> _handleOtpVerification() async {
-    final code = otpController.text.trim();
-    if (code.length < 4) {
-      setState(() => errorMessage = 'Please enter verification code');
-      return;
-    }
-
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 700));
-    auth.email.value = 'vendor@urbangoodz.com';
-    auth.businessName.value = 'Urban Goodz Merchant Store';
-    auth.isLoggedIn.value = true;
-
-    setState(() => isLoading = false);
-    Get.offAll(() => DashboardScreen());
+    setState(
+      () => errorMessage =
+          'Phone sign-in is not available yet. Use your email and password.',
+    );
   }
 
   /// Opens the real password-recovery flow.
@@ -304,6 +297,21 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                                         ),
                                       ),
                                     ),
+                                    // Phone-OTP sign-in is DISABLED.
+                                    //
+                                    // The handlers behind it never called any
+                                    // API: they awaited a fixed delay and then
+                                    // set isLoggedIn = true with a hardcoded
+                                    // vendor@urbangoodz.com identity, so any
+                                    // 4+ character code signed a user in.
+                                    //
+                                    // There is no vendor phone-OTP contract in
+                                    // routes/api/v1/api.php (auth/vendor
+                                    // exposes email/password only), so the tab
+                                    // is disabled rather than wired to an
+                                    // invented endpoint. Re-enable only once a
+                                    // real contract exists.
+                                    if (phoneOtpLoginEnabled)
                                     Expanded(
                                       child: GestureDetector(
                                         onTap: () => setState(() {

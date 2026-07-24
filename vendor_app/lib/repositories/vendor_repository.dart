@@ -6,6 +6,20 @@ class VendorRepository {
 
   final VendorApiClient api;
 
+  /// POST auth/vendor/login — contract read from VendorLoginController@login.
+  ///
+  /// Request : {email, password, vendor_type:'owner'}
+  /// Success : 200 {token, zone_wise_topic, module_type}
+  ///           NOTE: carries no vendor, store or approval payload; identity
+  ///           must be fetched separately via GET vendor/profile.
+  /// 403     : validation, or {errors:[{code:'auth-002'|'store_inactive'|
+  ///           'store_missing'}]}
+  /// 401     : {errors:[{code:'auth-001'}]} credentials / rental unavailable
+  /// 200     : {subscribed:{store_id, token, package_id, ...}} when the store
+  ///           is on store_business_model 'none'. This is NOT a usable
+  ///           session -- it is flagged so the caller can refuse it instead
+  ///           of treating the embedded token as a successful sign-in.
+  /// Throttle: 5 requests/minute (route middleware `throttle:5,1`).
   Future<Map<String, dynamic>> login(String email, String password) async {
     final body = _map(
       await api.post(
@@ -14,11 +28,13 @@ class VendorRepository {
       ),
     );
     final subscription = body['subscribed'];
-    return subscription is Map<String, dynamic>
-        ? subscription
-        : subscription is Map
-        ? Map<String, dynamic>.from(subscription)
-        : body;
+    if (subscription is Map) {
+      return {
+        ...Map<String, dynamic>.from(subscription),
+        'requires_subscription': true,
+      };
+    }
+    return body;
   }
 
   Future<Map<String, dynamic>> profile() async =>
