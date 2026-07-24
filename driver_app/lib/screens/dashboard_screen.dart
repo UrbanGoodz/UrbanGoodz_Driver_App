@@ -48,6 +48,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     jobsCtl.fetchJobs();
     dispatchCtl.load();
+
+    // Availability failures are surfaced here rather than from the controller,
+    // which keeps the controller headless-testable.
+    ever(controller.toggleError, (String message) {
+      if (message.isEmpty) return;
+      Get.snackbar(
+        'Availability',
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      controller.toggleError.value = '';
+    });
   }
 
   @override
@@ -57,23 +69,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       key: const Key('driver_dashboard'),
       child: Scaffold(
         body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'Jobs'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet),
-            label: 'Earnings',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) => setState(() => _currentIndex = i),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assignment),
+              label: 'Jobs',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet),
+              label: 'Earnings',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -106,6 +121,35 @@ class _DashboardBody extends StatelessWidget {
             ],
           ),
           actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Obx(
+                    () => Text(
+                      c.driverStatus.value == 'online' ? 'Online' : 'Offline',
+                      style: const TextStyle(
+                        color: AppTheme.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Obx(
+                    () => Switch(
+                      key: const Key('driver_online_toggle'),
+                      value: c.driverStatus.value == 'online',
+                      onChanged: c.isTogglingStatus.value
+                          ? null
+                          : (_) => c.toggleOnlineStatus(),
+                      activeThumbColor: AppTheme.white,
+                      activeTrackColor: AppTheme.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: GestureDetector(
@@ -264,61 +308,95 @@ class _DashboardBody extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: c.weeklyEarningsChart.asMap().entries.map((e) {
-                    final maxVal = c.weeklyEarningsChart.reduce(
-                      (a, b) => a > b ? a : b,
-                    );
-                    final height = (e.value / maxVal) * 120;
-                    final days = [
-                      'Mon',
-                      'Tue',
-                      'Wed',
-                      'Thu',
-                      'Fri',
-                      'Sat',
-                      'Sun',
-                    ];
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                // No backend route returns a per-day earnings series yet, so
+                // rather than charting invented numbers the card shows the
+                // real weekly total until one exists.
+                child: c.weeklyEarningsChart.isEmpty
+                    ? Center(
+                        key: const Key('weekly_earnings_total'),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              '\$${e.value.toInt()}',
+                              '\$${c.weeklyEarnings.value.toStringAsFixed(2)}',
                               style: const TextStyle(
-                                fontSize: 9,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
                                 color: AppTheme.dark,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Container(
-                              height: height,
-                              decoration: BoxDecoration(
-                                color: e.key == DateTime.now().weekday - 1
-                                    ? AppTheme.primary
-                                    : AppTheme.primary.withAlpha(80),
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(4),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              days[e.key],
-                              style: const TextStyle(
-                                fontSize: 10,
+                            const Text(
+                              'Earned this week',
+                              style: TextStyle(
+                                fontSize: 12,
                                 color: AppTheme.dark,
                               ),
                             ),
                           ],
                         ),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: c.weeklyEarningsChart.asMap().entries.map((
+                          e,
+                        ) {
+                          final maxVal = c.weeklyEarningsChart.reduce(
+                            (a, b) => a > b ? a : b,
+                          );
+                          final height = maxVal > 0
+                              ? (e.value / maxVal) * 120
+                              : 0.0;
+                          final days = [
+                            'Mon',
+                            'Tue',
+                            'Wed',
+                            'Thu',
+                            'Fri',
+                            'Sat',
+                            'Sun',
+                          ];
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '\$${e.value.toInt()}',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: AppTheme.dark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    height: height,
+                                    decoration: BoxDecoration(
+                                      color: e.key == DateTime.now().weekday - 1
+                                          ? AppTheme.primary
+                                          : AppTheme.primary.withAlpha(80),
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(4),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    days[e.key],
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppTheme.dark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
-                ),
               ),
               const SizedBox(height: 20),
               Row(

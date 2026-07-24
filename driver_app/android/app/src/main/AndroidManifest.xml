@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Driver availability: the dispatcher can only offer work to a driver
+         whose position was reported recently, so foreground location is
+         required for the app to function at all. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="Urban Goodz Driver"
         android:name="${applicationName}"
