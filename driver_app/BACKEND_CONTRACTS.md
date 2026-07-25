@@ -290,3 +290,158 @@ protected route on this backend returns 401 here.
 
 Not a Driver P0 blocker (the AI assistant screen is secondary), but it is a
 deployed route in a broken state and worth triaging.
+
+---
+
+## Addendum — how POST routes were verified (2026-07-25)
+
+The `401` vs `405` rule at the top of this file works for GET routes but
+**cannot** be used on POST-only routes. This backend has a catch-all
+fallback, so a `GET` to a deployed POST route and a `GET` to a URI with no
+route at all both return the same `302` redirect to the admin site root.
+
+The discriminator is `OPTIONS`, which Laravel answers with an `Allow`
+header listing the verbs actually registered for that URI. It mutates
+nothing and needs no token:
+
+| `Allow` header | Meaning |
+|---|---|
+| `GET,HEAD,POST` | a POST route is deployed at this URI |
+| `GET,HEAD` | only the fallback matched — no POST route exists |
+
+Verified deployed this way: `business-jobs/{id}/{accept,start,pickup,
+delivery,proof-pickup,proof-delivery,exception}`,
+`active-jobs/{id}/{start,complete,cancel,status}`,
+`load-board/{id}/{bid,accept}`, `payout-request`.
+
+---
+
+## CONTRACT-8 — Arrival check-in has no route
+
+```
+FEATURE:            Driver arrival check-in (at pickup / at dropoff)
+METHOD:             POST
+PATH:               /api/v1/urban-goodz/driver/business-jobs/{id}/arrived
+                    (proposed)
+REQUEST:            {latitude: <float>, longitude: <float>,
+                     arrived_at: <ISO8601>, leg: "pickup"|"dropoff"}
+RESPONSE:           {job: <BusinessJob with status "arrived">}
+AUTH:               driver bearer token
+PERMISSION:         only the driver the job is assigned to
+TABLES:             business_jobs (status), business_job_events
+STATUS TRANSITIONS: driver_en_route -> arrived
+NOTIFICATION:       notify the business contact that the driver has arrived
+PAYOUT EFFECT:      none directly; arrival timestamp is the usual basis for
+                    detention/wait-time pay, so recording it now avoids a
+                    backfill later
+ACCEPTANCE TEST:    a driver en route can check in on arrival, and the
+                    business sees the arrival time.
+```
+
+Four spellings were probed and all answer `Allow: GET,HEAD` (absent):
+`business-jobs/{id}/arrived`, `/arrive`, `/arrival`, `/check-in`. The same
+is true of `active-jobs/{id}/arrived`.
+
+`arrived` is a real step in the product flow (discovery -> accept -> en
+route -> **arrived** -> picked up -> delivered), so the app models it in
+`lib/models/job_lifecycle.dart` as a transition that exists but has no
+endpoint. The detail screen shows an explicit "Arrival check-in is not
+available yet" note in place of a button while the job is en route. It does
+not offer a control that would post nowhere, and it does not silently drop
+the step from the flow.
+
+**Until this exists, arrival time is not captured anywhere.** Note that
+`business-jobs/{id}/pickup` is reachable directly from `driver_en_route`,
+so the flow is not blocked — only the arrival timestamp is lost.
+
+---
+
+## CONTRACT-9 — Which id space accepts work, and where accepted work lands
+
+`active-jobs/{id}/accept` and `job-discovery/{id}/accept` both answer
+`Allow: GET,HEAD` — neither exists. The only deployed accept routes are:
+
+* `POST business-jobs/{id}/accept` — for jobs already assigned to the driver
+* `POST load-board/{id}/accept` — for loads on the open board
+
+The driver app previously called `acceptLoad(jobId)` from its active-jobs
+list, i.e. it sent an **active-job id to a load-board route**. Those are
+different id spaces, so the call either 404'd or — worse — hit an unrelated
+load with the same numeric id. Accept has been removed from
+`ActiveJobsController` entirely and now lives only on
+`LoadBoardController`, keyed by a load id taken from the board response.
+
+Please confirm:
+
+1. `load-board/{id}` ids and `active-jobs/{id}` ids are separate sequences
+   (the app now assumes they are).
+2. Whether `job-discovery` items are accepted via `load-board/{id}/accept`
+   using the discovery item's id, or whether discovery is browse-only. The
+   discovery screen currently has no accept action because no route for one
+   was found.
+
+---
+
+## CONTRACT-10 — `driver_task_status` vocabulary for `active-jobs/{id}/status`
+
+```
+FEATURE:            Marketplace job status updates
+METHOD:             POST
+PATH:               /api/v1/urban-goodz/driver/active-jobs/{id}/status
+                    (deployed)
+REQUEST:            {driver_task_status: <string>}
+RESPONSE:           {job: {... status: <string> ...}}
+AUTH:               driver bearer token
+PERMISSION:         only the driver the job is assigned to
+```
+
+The route is deployed but the accepted values for `driver_task_status` are
+undocumented, and there is no `active-jobs/{id}/pickup` route — so this is
+the only way to record a pickup on the marketplace path.
+
+The app currently sends `"picked_up"` and treats the request as successful
+**only** if the job the server echoes back has status `picked_up`,
+`in_transit` or `delivered`. A 2xx that leaves the status unchanged is
+reported to the driver as "not confirmed", never as a completed pickup.
+
+Please publish the enum. If `picked_up` is not the accepted spelling, the
+app is currently unable to record marketplace pickups — it will say so
+rather than claim one, but the step is effectively blocked.
+
+Also please confirm whether the response echoes the **job** (under a `job`
+key, as `start` and `complete` do) or a bare status object; the app reads
+`body["job"]["status"]` and treats a missing `job` as unconfirmed.
+
+---
+
+## CONTRACT-11 — Where does an accepted load appear?
+
+`POST load-board/{id}/accept` returns a job. The driver app has two job
+lists — `GET business-jobs` (what the Active Jobs screen renders) and
+`GET active-jobs` — and it is not documented which one the newly accepted
+job appears in, or whether it appears in both.
+
+Until this is answered the app tells the driver "Job #N is yours, refresh
+your jobs list" rather than naming a specific screen, because naming the
+wrong one sends them to an empty list and looks like the accept failed.
+
+Please state the relationship between `business-jobs` and `active-jobs`:
+disjoint sets, overlapping, or one a superset of the other.
+
+---
+
+## CONTRACT-12 — Completion is not an earnings receipt
+
+`POST active-jobs/{id}/complete` and `POST business-jobs/{id}/delivery`
+both return the job, not an earnings record. The previous build showed
+"Great work! Earnings have been added." on completion — an assertion about
+the driver's wallet that the response does not support.
+
+That message has been removed; completion now says only that the delivery
+is complete, and earnings are shown from `GET earnings` alone.
+
+If completion does credit the driver synchronously, please include the
+resulting earnings row (or at least `{amount, currency, earning_id}`) in
+the completion response and the app will show it. If crediting is
+asynchronous, please say what the expected lag is so the earnings screen
+can set the right expectation instead of appearing to have lost the money.
