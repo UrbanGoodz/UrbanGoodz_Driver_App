@@ -95,22 +95,91 @@ class LoadBoardController extends GetxController {
     sortLoads(sortBy.value);
   }
 
-  void bidOnLoad(String id) async {
+  /// Load ids currently on the board. A driver may only bid on or accept a
+  /// load the board actually served them.
+  Set<int> get boardLoadIds =>
+      availableLoads.map((l) => int.tryParse(l.id)).whereType<int>().toSet();
+
+  DriverJobModel? _boardLoad(String id) {
+    final loadId = int.tryParse(id);
+    if (loadId == null) return null;
+    for (final l in availableLoads) {
+      if (int.tryParse(l.id) == loadId) return l;
+    }
+    return null;
+  }
+
+  /// POST /api/v1/urban-goodz/driver/load-board/{id}/bid  (verified 2026-07-25)
+  ///
+  /// [bidAmount] is now required. The previous implementation hardcoded
+  /// `0.0` and then told the driver "Your bid has been submitted for
+  /// review" — every driver silently bid zero on every load.
+  Future<void> bidOnLoad(String id, double bidAmount, {String? notes}) async {
+    final load = _boardLoad(id);
+    if (load == null) {
+      _fail('That load is no longer on the board.');
+      return;
+    }
+    if (bidAmount <= 0) {
+      _fail('Enter a bid amount greater than zero.');
+      return;
+    }
     try {
-      final loadId = int.tryParse(id);
-      if (loadId == null) return;
-      await _api.bidOnLoad(loadId, 0.0);
+      await _api.bidOnLoad(int.parse(load.id), bidAmount, notes: notes);
       Get.snackbar(
         'Bid Submitted',
-        'Your bid has been submitted for review.',
+        'Your bid of \$${bidAmount.toStringAsFixed(2)} was submitted.',
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to submit bid: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _fail('Failed to submit bid: $e');
     }
   }
+
+  /// POST /api/v1/urban-goodz/driver/load-board/{id}/accept (verified
+  /// 2026-07-25). This is the app's only accept path — it takes a *load*
+  /// id, not an active-job id. Success is reported only when the server
+  /// returns the resulting job.
+  Future<void> acceptLoad(String id) async {
+    final load = _boardLoad(id);
+    if (load == null) {
+      _fail('That load is no longer on the board.');
+      return;
+    }
+    try {
+      final job = await _api.acceptLoad(int.parse(load.id));
+      if (job.isEmpty) {
+        Get.snackbar(
+          'Not confirmed',
+          'The server accepted the request but did not return the job. '
+              'Check Active Jobs before starting work.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+      availableLoads.removeWhere((l) => l.id == load.id);
+      applyFilters();
+      // Deliberately does not name the list the job lands in. The driver app
+      // has two job lists (`business-jobs`, which the Active Jobs screen
+      // reads, and `active-jobs`) and the backend has not documented which
+      // one an accepted load appears in — see CONTRACT-11. Claiming "it's in
+      // your Active Jobs" would be an assertion the app cannot support.
+      final jobId = job['id']?.toString() ?? job['job_id']?.toString();
+      Get.snackbar(
+        'Load Accepted',
+        jobId == null
+            ? 'The server confirmed the job is yours. Refresh your jobs list.'
+            : 'Job #$jobId is yours. Refresh your jobs list to start it.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      _fail('Failed to accept load: $e');
+    }
+  }
+
+  void _fail(String message) => Get.snackbar(
+        'Action not allowed',
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+      );
 }

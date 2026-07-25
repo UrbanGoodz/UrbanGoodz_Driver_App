@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/business_job_controller.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 import 'package:urban_goodz_driver/screens/purchase_card_screen.dart';
 
@@ -287,34 +288,46 @@ class _BusinessJobDetailScreenState extends State<BusinessJobDetailScreen> {
 
   Widget _actions(BusinessJobModel job) {
     final c = controller;
-    final s = job.status;
     final busy = c.actionLoading.value;
     return Column(
       children: [
-        if (c.canAccept(s))
+        if (c.canAccept(job))
           _btn('Accept Job', AppTheme.primary, busy, () => c.accept(job.jobId)),
-        if (c.canStart(s))
+        if (c.canStart(job))
           _btn(
             'Start (En Route)',
             AppTheme.primary,
             busy,
             () => c.start(job.jobId),
           ),
-        if (c.canPickup(s))
+        // Arrival check-in has no deployed endpoint yet (CONTRACT-8). It is
+        // shown disabled rather than hidden, so the step is visible in the
+        // flow without the app pretending it can record it.
+        if (!c.arrivalCheckInSupported && job.status == JobStatus.enRoute)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Arrival check-in is not available yet — go straight to '
+              'Mark Pickup when you have the package.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.orange),
+            ),
+          ),
+        if (c.canPickup(job))
           _btn(
             'Mark Pickup',
             AppTheme.primary,
             busy,
             () => _submitProof(job, true),
           ),
-        if (c.canDeliver(s))
+        if (c.canDeliver(job))
           _btn(
             'Mark Delivery',
             AppTheme.primary,
             busy,
             () => _submitProof(job, false),
           ),
-        if (c.canReportException(s))
+        if (c.canReportException(job))
           _btn(
             'Report Exception',
             Colors.orange,

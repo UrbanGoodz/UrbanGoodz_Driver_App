@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
 import 'package:urban_goodz_driver/services/api_client.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 
 /// Manages assigned business courier jobs: list, detail, and the
 /// accept/start/pickup/delivery state machine plus proof + exception.
@@ -17,28 +18,47 @@ class BusinessJobController extends GetxController {
   var actionLoading = false.obs;
   var errorMessage = ''.obs;
 
-  // Statuses that permit each action (per Session 2 contract state machine).
-  bool canAccept(String s) => s == 'assigned';
-  bool canStart(String s) => s == 'assigned' || s == 'driver_en_route';
-  bool canPickup(String s) => s == 'driver_en_route' || s == 'picked_up';
-  bool canDeliver(String s) =>
-      s == 'picked_up' ||
-      s == 'in_transit' ||
-      s == 'delayed' ||
-      s == 'delivered';
-  bool canReportException(String s) => [
-    'assigned',
-    'driver_en_route',
-    'picked_up',
-    'in_transit',
-    'delayed',
-  ].contains(s);
+  /// Job ids this driver actually holds. Only ever populated from the
+  /// driver-scoped, token-authorized endpoints (`business-jobs` and
+  /// `business-jobs/{id}`); a successful response from either is the
+  /// backend asserting ownership. Nothing else may add to this set, so a
+  /// job id arriving from a deep link or a public feed cannot be acted on.
+  final Set<int> _ownedJobIds = <int>{};
+
+  Set<int> get ownedJobIds => Set.unmodifiable(_ownedJobIds);
+
+  /// Visible for tests: the single gate every action passes through.
+  TransitionCheck check(JobTransition t, BusinessJobModel job) =>
+      JobLifecycle.check(
+        t,
+        jobId: job.jobId,
+        status: job.status,
+        ownedJobIds: _ownedJobIds,
+      );
+
+  bool canAccept(BusinessJobModel j) => check(JobTransition.accept, j).allowed;
+  bool canStart(BusinessJobModel j) => check(JobTransition.start, j).allowed;
+  bool canPickup(BusinessJobModel j) => check(JobTransition.pickup, j).allowed;
+  bool canDeliver(BusinessJobModel j) => check(JobTransition.deliver, j).allowed;
+  bool canReportException(BusinessJobModel j) =>
+      check(JobTransition.reportException, j).allowed;
+
+  /// Arrival check-in has no deployed endpoint (probed 2026-07-25: 405).
+  /// Surfaced so the UI can show it as unavailable rather than omit it
+  /// silently or pretend it succeeded. See CONTRACT-8.
+  bool get arrivalCheckInSupported => JobLifecycle.hasEndpoint(
+    JobTransition.arrived,
+  );
 
   Future<void> fetchJobs() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      jobs.value = await _api.getBusinessJobs();
+      final fetched = await _api.getBusinessJobs();
+      jobs.value = fetched;
+      _ownedJobIds
+        ..clear()
+        ..addAll(fetched.map((j) => j.jobId));
     } catch (e) {
       errorMessage.value = _msg(e);
     } finally {
@@ -50,7 +70,11 @@ class BusinessJobController extends GetxController {
     isDetailLoading.value = true;
     errorMessage.value = '';
     try {
-      selectedJob.value = await _api.getBusinessJobDetail(jobId);
+      final job = await _api.getBusinessJobDetail(jobId);
+      selectedJob.value = job;
+      // The detail route is driver-scoped: a 2xx here is the backend
+      // confirming this job belongs to the caller.
+      if (job.jobId != 0) _ownedJobIds.add(job.jobId);
     } catch (e) {
       errorMessage.value = _msg(e);
     } finally {
@@ -58,15 +82,50 @@ class BusinessJobController extends GetxController {
     }
   }
 
+  /// Runs one lifecycle transition.
+  ///
+  /// Refuses before touching the network if the driver does not own the job
+  /// or the status does not permit the move, and — critically — only reports
+  /// success when the job the server echoes back actually shows the new
+  /// state. A 2xx with an unchanged status is reported as unconfirmed, not
+  /// as "done". This is the specific failure this recovery exists to remove.
   Future<void> _run(
+    JobTransition transition,
+    int jobId,
     Future<BusinessJobModel> Function() call,
     String successMsg,
   ) async {
+    final job = _jobById(jobId);
+    if (job == null) {
+      _fail('This job is not assigned to you.');
+      return;
+    }
+    final gate = check(transition, job);
+    if (gate.refused) {
+      _fail(gate.message);
+      return;
+    }
+
     actionLoading.value = true;
     try {
       final updated = await call();
       _replace(updated);
       selectedJob.value = updated;
+
+      if (!JobLifecycle.confirms(transition, updated.status)) {
+        // The call was accepted but the job did not move. Say exactly that
+        // rather than claiming the step completed.
+        Get.snackbar(
+          'Not confirmed',
+          'The server accepted the request but the job is still '
+              '"${updated.status}". Pull to refresh before retrying.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
       Get.snackbar(
         'Success',
         successMsg,
@@ -87,20 +146,60 @@ class BusinessJobController extends GetxController {
     }
   }
 
-  void accept(int jobId) =>
-      _run(() => _api.acceptBusinessJob(jobId), 'Job accepted');
-  void start(int jobId) =>
-      _run(() => _api.startBusinessJob(jobId), 'Job started');
-  void pickup(int jobId) =>
-      _run(() => _api.pickupBusinessJob(jobId), 'Pickup complete');
-  void deliver(int jobId) =>
-      _run(() => _api.deliverBusinessJob(jobId), 'Delivery complete');
+  Future<void> accept(int jobId) => _run(
+    JobTransition.accept,
+    jobId,
+    () => _api.acceptBusinessJob(jobId),
+    'Job accepted',
+  );
+
+  Future<void> start(int jobId) => _run(
+    JobTransition.start,
+    jobId,
+    () => _api.startBusinessJob(jobId),
+    'You are en route',
+  );
+
+  Future<void> pickup(int jobId) => _run(
+    JobTransition.pickup,
+    jobId,
+    () => _api.pickupBusinessJob(jobId),
+    'Pickup complete',
+  );
+
+  Future<void> deliver(int jobId) => _run(
+    JobTransition.deliver,
+    jobId,
+    () => _api.deliverBusinessJob(jobId),
+    'Delivery complete',
+  );
+
+  BusinessJobModel? _jobById(int jobId) {
+    final selected = selectedJob.value;
+    if (selected != null && selected.jobId == jobId) return selected;
+    for (final j in jobs) {
+      if (j.jobId == jobId) return j;
+    }
+    return null;
+  }
+
+  void _fail(String message) => Get.snackbar(
+    'Action not allowed',
+    message,
+    snackPosition: SnackPosition.BOTTOM,
+    backgroundColor: Colors.redAccent,
+    colorText: Colors.white,
+  );
 
   Future<void> submitPickupProof(
     int jobId, {
     required String proofUrl,
     String? notes,
   }) async {
+    if (!_ownedJobIds.contains(jobId)) {
+      _fail('This job is not assigned to you.');
+      return;
+    }
     actionLoading.value = true;
     try {
       final url = await _api.submitPickupProof(
@@ -160,6 +259,10 @@ class BusinessJobController extends GetxController {
     required String proofUrl,
     String? notes,
   }) async {
+    if (!_ownedJobIds.contains(jobId)) {
+      _fail('This job is not assigned to you.');
+      return;
+    }
     actionLoading.value = true;
     try {
       final url = await _api.submitDeliveryProof(
@@ -219,6 +322,16 @@ class BusinessJobController extends GetxController {
     required String reason,
     String? notes,
   }) async {
+    final job = _jobById(jobId);
+    if (job == null) {
+      _fail('This job is not assigned to you.');
+      return;
+    }
+    final gate = check(JobTransition.reportException, job);
+    if (gate.refused) {
+      _fail(gate.message);
+      return;
+    }
     actionLoading.value = true;
     try {
       final updated = await _api.reportException(
