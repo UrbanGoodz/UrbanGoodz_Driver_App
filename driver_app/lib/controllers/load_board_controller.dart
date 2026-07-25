@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
+import 'package:urban_goodz_driver/utils/driver_notice.dart';
 import 'package:urban_goodz_driver/models/driver_job_model.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
 
 class LoadBoardController extends GetxController {
@@ -16,13 +18,18 @@ class LoadBoardController extends GetxController {
   var currentPage = 1.obs;
   var hasMore = true.obs;
 
+  /// How the last bid or accept ended. `unconfirmed` means the server took
+  /// the request but did not return the job, so the app cannot say the
+  /// driver holds it.
+  var lastOutcome = TransitionOutcome.none.obs;
+
   @override
   void onInit() {
     fetchLoads();
     super.onInit();
   }
 
-  void fetchLoads({bool refresh = false}) async {
+  Future<void> fetchLoads({bool refresh = false}) async {
     if (refresh) {
       currentPage.value = 1;
       hasMore.value = true;
@@ -117,21 +124,24 @@ class LoadBoardController extends GetxController {
   Future<void> bidOnLoad(String id, double bidAmount, {String? notes}) async {
     final load = _boardLoad(id);
     if (load == null) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail('That load is no longer on the board.');
       return;
     }
     if (bidAmount <= 0) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail('Enter a bid amount greater than zero.');
       return;
     }
     try {
       await _api.bidOnLoad(int.parse(load.id), bidAmount, notes: notes);
-      Get.snackbar(
+      lastOutcome.value = TransitionOutcome.success;
+      showNotice(
         'Bid Submitted',
         'Your bid of \$${bidAmount.toStringAsFixed(2)} was submitted.',
-        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
+      lastOutcome.value = TransitionOutcome.failed;
       _fail('Failed to submit bid: $e');
     }
   }
@@ -143,43 +153,44 @@ class LoadBoardController extends GetxController {
   Future<void> acceptLoad(String id) async {
     final load = _boardLoad(id);
     if (load == null) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail('That load is no longer on the board.');
       return;
     }
     try {
       final job = await _api.acceptLoad(int.parse(load.id));
       if (job.isEmpty) {
-        Get.snackbar(
+        lastOutcome.value = TransitionOutcome.unconfirmed;
+        showNotice(
           'Not confirmed',
           'The server accepted the request but did not return the job. '
-              'Check Active Jobs before starting work.',
-          snackPosition: SnackPosition.BOTTOM,
+              'Refresh your jobs list to confirm before starting work.',
         );
         return;
       }
       availableLoads.removeWhere((l) => l.id == load.id);
       applyFilters();
+      lastOutcome.value = TransitionOutcome.success;
       // Deliberately does not name the list the job lands in. The driver app
       // has two job lists (`business-jobs`, which the Active Jobs screen
       // reads, and `active-jobs`) and the backend has not documented which
       // one an accepted load appears in — see CONTRACT-11. Claiming "it's in
       // your Active Jobs" would be an assertion the app cannot support.
       final jobId = job['id']?.toString() ?? job['job_id']?.toString();
-      Get.snackbar(
+      showNotice(
         'Load Accepted',
         jobId == null
             ? 'The server confirmed the job is yours. Refresh your jobs list.'
             : 'Job #$jobId is yours. Refresh your jobs list to start it.',
-        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
+      lastOutcome.value = TransitionOutcome.failed;
       _fail('Failed to accept load: $e');
     }
   }
 
-  void _fail(String message) => Get.snackbar(
+  void _fail(String message) => showNotice(
         'Action not allowed',
         message,
-        snackPosition: SnackPosition.BOTTOM,
       );
 }

@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:urban_goodz_driver/utils/driver_notice.dart';
 import 'package:urban_goodz_driver/models/driver_job_model.dart';
 import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
@@ -12,13 +13,17 @@ class ActiveJobsController extends GetxController {
   var isLoading = true.obs;
   var errorMessage = ''.obs;
 
+  /// How the last attempted transition ended. Distinguishes a real state
+  /// change from a request the server accepted without moving the job.
+  var lastOutcome = TransitionOutcome.none.obs;
+
   @override
   void onInit() {
     fetchActiveJobs();
     super.onInit();
   }
 
-  void fetchActiveJobs() async {
+  Future<void> fetchActiveJobs() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
@@ -100,22 +105,25 @@ class ActiveJobsController extends GetxController {
   Future<void> cancelJob(String id) async {
     final job = _ownedJob(id);
     if (job == null) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail('This job is not assigned to you.');
       return;
     }
     if (JobStatus.isTerminal(job.status)) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail('This job is already ${job.status.replaceAll('_', ' ')}.');
       return;
     }
     try {
       await _api.cancelActiveJob(int.parse(job.id));
-      fetchActiveJobs();
-      Get.snackbar(
+      await fetchActiveJobs();
+      lastOutcome.value = TransitionOutcome.success;
+      showNotice(
         'Job Cancelled',
         'The job has been removed from your list.',
-        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
+      lastOutcome.value = TransitionOutcome.failed;
       _fail('Failed to cancel job: $e');
     }
   }
@@ -136,6 +144,7 @@ class ActiveJobsController extends GetxController {
   ) async {
     final job = _ownedJob(id);
     if (job == null) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail('This job is not assigned to you.');
       return;
     }
@@ -146,38 +155,39 @@ class ActiveJobsController extends GetxController {
       ownedJobIds: ownedJobIds,
     );
     if (gate.refused) {
+      lastOutcome.value = TransitionOutcome.refused;
       _fail(gate.message);
       return;
     }
     try {
       final updated = await call(int.parse(job.id));
-      fetchActiveJobs();
+      await fetchActiveJobs();
       final newStatus = updated['status']?.toString() ?? '';
       if (newStatus.isEmpty || !JobLifecycle.confirms(transition, newStatus)) {
-        Get.snackbar(
+        lastOutcome.value = TransitionOutcome.unconfirmed;
+        showNotice(
           'Not confirmed',
           newStatus.isEmpty
               ? 'The server accepted the request but did not report a new '
                   'status. Refresh to check.'
               : 'The server accepted the request but the job is still '
                   '"$newStatus". Refresh before retrying.',
-          snackPosition: SnackPosition.BOTTOM,
         );
         return;
       }
-      Get.snackbar(
+      lastOutcome.value = TransitionOutcome.success;
+      showNotice(
         'Updated',
         successMsg,
-        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
+      lastOutcome.value = TransitionOutcome.failed;
       _fail('Failed: $e');
     }
   }
 
-  void _fail(String message) => Get.snackbar(
+  void _fail(String message) => showNotice(
         'Action not allowed',
         message,
-        snackPosition: SnackPosition.BOTTOM,
       );
 }

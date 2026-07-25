@@ -45,6 +45,29 @@ library;
 
 enum JobTransition { accept, start, arrived, pickup, deliver, reportException }
 
+/// How the last attempted transition actually ended.
+///
+/// This is deliberately four-valued. The build being replaced had two
+/// states — it showed a success snackbar or an error one — which is why a
+/// request the server accepted without moving the job read to the driver as
+/// a completed step. [unconfirmed] is the state that had no name.
+enum TransitionOutcome {
+  none,
+
+  /// The server echoed a job whose status proves the transition landed.
+  success,
+
+  /// The call returned 2xx but the job did not move. Not a success.
+  unconfirmed,
+
+  /// Refused locally, before the network: not owned, wrong status, or no
+  /// deployed endpoint.
+  refused,
+
+  /// The call threw.
+  failed,
+}
+
 /// Why a transition was refused. `none` means it was allowed.
 enum TransitionRefusal {
   none,
