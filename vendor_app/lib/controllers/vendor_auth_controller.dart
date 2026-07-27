@@ -19,7 +19,14 @@ class VendorAuthController extends GetxController {
   final isInitialized = false.obs;
   final isLoading = false.obs;
   final errorMessage = RxnString();
+  /// One of: unknown | approved | pending | suspended | store_missing |
+  /// denied | subscription_required. Every value maps to a state the backend
+  /// actually emits; none is invented.
   final approvalStatus = 'unknown'.obs;
+
+  /// True when the backend answered 200 with a `subscribed` payload instead
+  /// of a usable session (store_business_model == 'none').
+  final requiresSubscription = false.obs;
 
   final businessName = ''.obs;
   final ownerName = ''.obs;
@@ -84,11 +91,66 @@ class VendorAuthController extends GetxController {
     }
   }
 
+  /// Extracts the machine-readable error code the backend emits, e.g.
+  /// `auth-001`, `auth-002`, `store_inactive`, `store_missing`.
+  ///
+  /// Preferred over matching on `message`, which is passed through
+  /// `translate()` server-side and therefore changes with the vendor's
+  /// language.
+  static String? _errorCode(VendorApiException error) {
+    final body = error.body;
+    if (body is! Map) return null;
+    final errors = body['errors'];
+    if (errors is List && errors.isNotEmpty && errors.first is Map) {
+      return (errors.first as Map)['code']?.toString();
+    }
+    return null;
+  }
+
+  /// Maps a login failure to an account state.
+  ///
+  /// Only states the backend actually emits are used. `VendorLoginController`
+  /// + `storeSubscriptionCheck` produce exactly:
+  ///   auth-001       401  credentials rejected (or rental addon unavailable)
+  ///   auth-002       403  registration not approved yet
+  ///   store_inactive 403  store or owner not active -> suspended
+  ///   store_missing  403  no store assigned to the vendor
+  /// There is no "rejected" state in the backend, so none is invented here.
+  static String _accountStateFor(VendorApiException error) {
+    switch (_errorCode(error)) {
+      case 'auth-002':
+        return 'pending';
+      case 'store_inactive':
+        return 'suspended';
+      case 'store_missing':
+        return 'store_missing';
+      case 'auth-001':
+        return 'denied';
+      default:
+        return error.statusCode == 403 ? 'denied' : 'unknown';
+    }
+  }
+
   Future<bool> login(String emailAddress, String password) async {
     isLoading.value = true;
     errorMessage.value = null;
+    requiresSubscription.value = false;
+    approvalStatus.value = 'unknown';
     try {
       final result = await repository.login(emailAddress.trim(), password);
+
+      // A store on `store_business_model == 'none'` gets HTTP 200 carrying a
+      // `subscribed` payload rather than a normal session. It contains a
+      // token, so it must be rejected explicitly or the vendor would land on
+      // a dashboard they have no active subscription for.
+      if (result['requires_subscription'] == true) {
+        requiresSubscription.value = true;
+        approvalStatus.value = 'subscription_required';
+        errorMessage.value =
+            'This store needs an active subscription before you can sign in.';
+        return false;
+      }
+
       final token = result['token']?.toString();
       if (token == null || token.isEmpty) {
         throw const VendorApiException(
@@ -101,20 +163,21 @@ class VendorAuthController extends GetxController {
       await preferences.setString(_tokenKey, token);
       await preferences.setString(_emailKey, emailAddress.trim());
       email.value = emailAddress.trim();
+      // Identity comes from GET vendor/profile; the login response carries
+      // only token, zone_wise_topic and module_type.
       await refreshProfile();
+      approvalStatus.value = 'approved';
       isLoggedIn.value = true;
       await _registerFcmToken();
       return true;
     } on VendorApiException catch (error) {
-      approvalStatus.value = error.message.toLowerCase().contains('approved')
-          ? 'pending'
-          : error.message.toLowerCase().contains('suspended')
-          ? 'suspended'
-          : 'denied';
+      approvalStatus.value = _accountStateFor(error);
       errorMessage.value = error.message;
+      await _clearSession();
       return false;
     } catch (error) {
       errorMessage.value = 'Unable to reach the Vendor API: $error';
+      await _clearSession();
       return false;
     } finally {
       isLoading.value = false;

@@ -21,11 +21,50 @@ class DashboardController extends GetxController {
   final lowStockItems = 0.obs;
   final recentOrders = <VendorOrderModel>[].obs;
   final topProducts = <InventoryItemModel>[].obs;
+  /// Daily revenue for the last 7 days. No endpoint supplies this series yet,
+  /// so it stays all zeros for every vendor - see [hasNoRevenue].
   final revenueChart = List<double>.filled(7, 0).obs;
   final storeStatus = 'closed'.obs;
   final isLoading = false.obs;
   final errorMessage = RxnString();
   final notificationCount = 0.obs;
+
+  /// True when no day in the window carries usable revenue, including when the
+  /// series is empty. The chart renders an empty state instead of bars.
+  bool get hasNoRevenue => !revenueChart.any(_isPlottable);
+
+  /// Relative bar heights for [values]: each is `0.0..1.0`, where `1.0` is the
+  /// largest plottable day in the window.
+  ///
+  /// Scaling must never divide by a non-positive maximum. An all-zero series
+  /// makes `value / max` compute `0 / 0` -> NaN, and `num.clamp` does not
+  /// preserve NaN: `double.nan.clamp(8, 120)` returns the *upper* bound, 120.
+  /// So every bar was silently drawn at full height instead of no height.
+  /// A vendor signing in for the first time has exactly that series, so this
+  /// was the default view.
+  ///
+  /// Full height then did not fit: 120px of bar plus 8px of spacers plus two
+  /// 9pt labels needs ~154px inside a 140px row, which is the 14px RenderFlex
+  /// overflow. Fractions rather than pixels fix that half - the caller gives
+  /// them to a FractionallySizedBox filling whatever space the row has left
+  /// after its labels, so a bar cannot outgrow its container whatever the text
+  /// measures.
+  static List<double> barFractions(List<double> values) {
+    var max = 0.0;
+    for (final value in values) {
+      if (_isPlottable(value) && value > max) max = value;
+    }
+    if (max <= 0) return List<double>.filled(values.length, 0);
+    return [
+      for (final value in values)
+        _isPlottable(value) ? (value / max).clamp(0.0, 1.0) : 0.0,
+    ];
+  }
+
+  /// A value can be drawn only if it is a real, positive amount. NaN and
+  /// infinity reach here when the API sends them as strings, since
+  /// `double.tryParse` accepts both.
+  static bool _isPlottable(double value) => value.isFinite && value > 0;
 
   @override
   void onInit() {
