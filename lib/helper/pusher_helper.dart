@@ -1,280 +1,196 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+
 import 'package:dart_pusher_channels/dart_pusher_channels.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart/features/splash/controllers/splash_controller.dart';
-import 'package:sixam_mart/features/auth/controllers/auth_controller.dart';
-import 'package:sixam_mart/features/ride_share_module/common/controllers/map_controller.dart';
-import 'package:sixam_mart/features/ride_share_module/common/widgets/confirmation_trip_dialog.dart';
-import 'package:sixam_mart/features/ride_share_module/ride_order/controllers/ride_controller.dart';
-import 'package:sixam_mart/features/ride_share_module/ride_order/screens/ride_order_complete_screen.dart';
-import 'package:sixam_mart/features/ride_share_module/ride_payment/screens/ride_payment_screen.dart';
-import 'package:sixam_mart/features/ride_share_module/safety_alert/controllers/safety_alert_controller.dart';
 import 'package:sixam_mart/util/app_constants.dart';
-import '../features/ride_share_module/ride_location/screens/map_screen.dart';
 
+/// Compile-time public connection metadata. No Pusher secret belongs in a
+/// Shopper build. Production supplies these values with `--dart-define`.
+class ShopperRealtimeContract {
+  static const String appKey = String.fromEnvironment('UG_PUSHER_APP_KEY');
+  static const String cluster = String.fromEnvironment('UG_PUSHER_APP_CLUSTER');
+  static const String host = String.fromEnvironment('UG_PUSHER_HOST');
+  static const int port = int.fromEnvironment(
+    'UG_PUSHER_PORT',
+    defaultValue: 443,
+  );
 
+  static bool get isConfigured =>
+      appKey.trim().isNotEmpty && cluster.trim().isNotEmpty;
 
-class PusherHelper{
+  static String get authorizationEndpoint =>
+      '${AppConstants.baseUrl}/api/v1/realtime/shopper/broadcasting/auth';
 
-  static PusherChannelsClient?  pusherClient;
+  static String ordersChannel(int customerId) =>
+      'private-ug.shopper.$customerId.orders';
 
-  static Future<void> initializePusher() async{
-    PusherChannelsOptions testOptions = PusherChannelsOptions.fromHost(
-      host: Get.find<SplashController>().configModel?.websocketUrl ?? '192.168.1.62',
-      scheme: 'ws',
-      key: '6ammart',
-      port: 6001,
+  static String paymentChannel(int customerId) =>
+      'private-ug.payment.shopper.$customerId.statuses';
+
+  static PusherChannelsOptions options() {
+    if (!isConfigured) {
+      throw StateError('Shopper realtime is not configured.');
+    }
+
+    if (host.trim().isNotEmpty) {
+      return PusherChannelsOptions.fromHost(
+        scheme: 'wss',
+        host: host.trim(),
+        key: appKey.trim(),
+        port: port,
+        shouldSupplyMetadataQueries: true,
+        metadata: PusherChannelsOptionsMetadata.byDefault(),
+      );
+    }
+
+    return PusherChannelsOptions.fromCluster(
+      scheme: 'wss',
+      cluster: cluster.trim(),
+      key: appKey.trim(),
+      host: 'pusher.com',
+      port: port,
+      shouldSupplyMetadataQueries: true,
+      metadata: PusherChannelsOptionsMetadata.byDefault(),
     );
+  }
+}
 
-    pusherClient = PusherChannelsClient.websocket(
-      options: testOptions,
+class PusherHelper {
+  static PusherChannelsClient? _client;
+  static final List<PrivateChannel> _channels = [];
+  static final List<StreamSubscription<dynamic>> _subscriptions = [];
+
+  static Future<bool> initializePusher() async {
+    if (!ShopperRealtimeContract.isConfigured) return false;
+    if (_client != null) return true;
+
+    final client = PusherChannelsClient.websocket(
+      options: ShopperRealtimeContract.options(),
       connectionErrorHandler: (exception, trace, refresh) async {
-        log('=================$exception');
+        log(
+          'Shopper realtime connection failed: ${exception.runtimeType}',
+          name: 'UrbanGoodzRealtime',
+        );
         refresh();
       },
     );
+    _client = client;
 
-    await pusherClient?.connect();
+    _subscriptions.add(
+      client.onConnectionEstablished.listen((_) {
+        _setConnectionStatus('Connected');
+        for (final channel in _channels) {
+          channel.subscribeIfNotUnsubscribed();
+        }
+      }),
+    );
+    _subscriptions.add(
+      client.lifecycleStream.listen((event) {
+        if (!event.toString().toLowerCase().contains('established')) {
+          _setConnectionStatus('Disconnected');
+        }
+      }),
+    );
 
-
-    String? pusherChannelId =  pusherClient?.channelsManager.channelsConnectionDelegate.socketId;
-      if(pusherChannelId != null){
-        log('=================Pusher Connected');
-      }
-
-
-     pusherClient?.lifecycleStream.listen((event) {
-       log('=================Pusher DisConnected');
-     });
-
-
+    await client.connect();
+    return true;
   }
 
-  // late PrivateChannel pusherDriverLocation;
-  late PublicChannel? publicChannel;
+  static Future<bool> subscribeShopperAccount({
+    required int customerId,
+    required String bearerToken,
+    required void Function(Map<String, dynamic> payload) onOrderUpdated,
+    void Function(Map<String, dynamic> payload)? onPaymentUpdated,
+  }) async {
+    if (customerId <= 0 || bearerToken.trim().isEmpty) return false;
+    if (!await initializePusher()) return false;
 
-  void pusherDriverStatus({required String deliverymanId, required Function(RecordLocationBodyModel) onLocationReceived}){
+    final authorization =
+        EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
+          authorizationEndpoint: Uri.parse(
+            ShopperRealtimeContract.authorizationEndpoint,
+          ),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer ${bearerToken.trim()}',
+          },
+        );
 
-    String channel = 'dm_location_$deliverymanId';
+    final orders = _client!.privateChannel(
+      ShopperRealtimeContract.ordersChannel(customerId),
+      authorizationDelegate: authorization,
+    );
+    _channels.add(orders);
+    _subscriptions.add(
+      orders.bind('order.status.updated').listen((event) {
+        final payload = _decodePayload(event.data);
+        if (payload != null) onOrderUpdated(payload);
+      }),
+    );
+    _subscriptions.add(
+      orders.bind('pusher:subscription_error').listen((_) {
+        log(
+          'Shopper order-channel authorization failed.',
+          name: 'UrbanGoodzRealtime',
+        );
+      }),
+    );
 
-    log('========channel is: $channel');
-
-    // _publicChannel = pusherClient!.publicChannel('pusher:subscribe');
-    publicChannel = pusherClient!.publicChannel(channel);
-
-    // _publicChannel.subscribe();
-    publicChannel?.subscribeIfNotUnsubscribed();
-    // FIX: PublicChannel uses 'pusher:subscription_succeeded' event via bind()
-
-    publicChannel?.bind('pusher:subscription_succeeded').listen((_) {
-      log('=======Public Subscribed');
-    });
-
-    publicChannel?.bind('pusher:subscription_error').listen((error) {
-      log('=======Public Subscription Failed: ${error.data}');
-    });
-
-    publicChannel?.bind(channel).listen((event) {
-      log('===========pusherDriverStatus bind is: ${event.data}');
-      onLocationReceived(RecordLocationBodyModel(
-        latitude: jsonDecode(event.data)['latitude'],
-        longitude: jsonDecode(event.data)['longitude'],
-        location: jsonDecode(event.data)['location'],
-      ));
-    });
-
-
-  }
-
-
-
-  late PrivateChannel pusherDriverAccepted;
-  late PrivateChannel driverTripStarted;
-  late PrivateChannel driverTripCancelled;
-  late PrivateChannel driverTripCompleted;
-  late PrivateChannel driverPaymentReceived;
-
-  void pusherRiderStatus(String tripId){
-
-    if (Get.find<SplashController>().pusherConnectionStatus != null || Get.find<SplashController>().pusherConnectionStatus == 'Connected'){
-      pusherDriverAccepted = pusherClient!.privateChannel("private-driver-trip-accepted.$tripId", authorizationDelegate:
-      EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
-        authorizationEndpoint: Uri.parse('${AppConstants.baseUrl}${AppConstants.pusherBroadcustUrl}'),
-        headers:  {
-          "Accept": "application/json",
-          "Authorization": "Bearer ${Get.find<AuthController>().getUserToken()}",
-          "Access-Control-Allow-Origin": "*",
-          'Access-Control-Allow-Methods':"PUT, GET, POST, DELETE, OPTIONS"
-        },
-      ));
-
-      if(pusherDriverAccepted.currentStatus ==  null){
-        pusherDriverAccepted.subscribe();
-        pusherDriverAccepted.bind("driver-trip-accepted.$tripId").listen((event) {
-          print('======driver-trip-accepted');
-          // Get.back();
-          Get.find<RideController>().getRideDetails(jsonDecode(event.data!)['id']?.toString()??'').then((value){
-            if(value.statusCode == 200){
-
-              Get.find<RideController>().updateRideCurrentState(RideState.acceptingRider);
-              Get.find<RideController>().startLocationRecord();
-              Get.find<RideController>().updateRideController();
-              // Get.find<MapController>().notifyMapController();
-              print('----pusher--current route: ${Get.currentRoute}');
-              if(Get.currentRoute == '/MapScreen'){
-                Get.off(() => const MapScreen(fromScreen: MapScreenType.dashboard));
-              } else {
-                Get.to(() => const MapScreen(fromScreen: MapScreenType.dashboard));
-              }
-            }
-          });
-        });
-      }
-
-
-
-      driverTripStarted = pusherClient!.privateChannel("private-driver-trip-started.$tripId", authorizationDelegate:
-      EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
-        authorizationEndpoint: Uri.parse('${AppConstants.baseUrl}${AppConstants.pusherBroadcustUrl}'),
-        headers:  {
-          "Accept": "application/json",
-          "Authorization": "Bearer ${Get.find<AuthController>().getUserToken()}",
-          "Access-Control-Allow-Origin": "*",
-          'Access-Control-Allow-Methods':"PUT, GET, POST, DELETE, OPTIONS"
-        },
-      ));
-
-      if(driverTripStarted.currentStatus == null){
-        driverTripStarted.subscribe();
-        driverTripStarted.bind("driver-trip-started.$tripId").listen((event) {
-          print('======driver-trip-started');
-          Get.find<RideController>().remainingDistance(jsonDecode(event.data!)['id']?.toString()??'', mapBound: false);
-          Get.find<RideController>().startLocationRecord();
-          Get.find<RideController>().getRideDetails(jsonDecode(event.data!)['id']?.toString()??'');
-          Get.find<RideController>().updateRideCurrentState(RideState.ongoingRide);
-          Get.find<SafetyAlertController>().checkDriverNeedSafety();
-          // Get.find<RideController>().updateRideController();
-          if(Get.currentRoute != '/MapScreen') {
-            Get.to(() => const MapScreen(fromScreen: MapScreenType.splash));
-          }
-
-        });
-      }
-
-
-      driverTripCancelled = pusherClient!.privateChannel("private-driver-trip-cancelled.$tripId", authorizationDelegate:
-      EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
-        authorizationEndpoint: Uri.parse('${AppConstants.baseUrl}${AppConstants.pusherBroadcustUrl}'),
-        // authorizationEndpoint: Uri.parse('https://${Get.find<SplashController>().configModel!.webSocketUri}/broadcasting/auth'),
-        headers:  {
-          "Accept": "application/json",
-          "Authorization": "Bearer ${Get.find<AuthController>().getUserToken()}",
-          "Access-Control-Allow-Origin": "*",
-          'Access-Control-Allow-Methods':"PUT, GET, POST, DELETE, OPTIONS"
-        },
-      ));
-
-      if(driverTripCancelled.currentStatus == null){
-        driverTripCancelled.subscribe();
-        driverTripCancelled.bind("driver-trip-cancelled.$tripId").listen((event) async{
-          print('======driver-trip-cancelled');
-          Get.find<RideController>().getCurrentRide();
-          Get.find<RideController>().stopLocationRecord();
-          Get.find<SafetyAlertController>().cancelDriverNeedSafetyStream();
-
-          if(Get.currentRoute == '/MapScreen') {
-            Get.off(() => RideOrderCompleteScreen(tripId: jsonDecode(event.data!)['id']?.toString() ?? ''));
-          } else {
-            Get.to(() => RideOrderCompleteScreen(tripId: jsonDecode(event.data!)['id']?.toString() ?? ''));
-          }
-        });
-      }
-
-
-
-      driverTripCompleted = pusherClient!.privateChannel("private-driver-trip-completed.$tripId", authorizationDelegate:
-      EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
-        authorizationEndpoint: Uri.parse('${AppConstants.baseUrl}${AppConstants.pusherBroadcustUrl}'),
-        // authorizationEndpoint: Uri.parse('https://${Get.find<SplashController>().configModel!.webSocketUri}/broadcasting/auth'),
-        headers:  {
-          "Accept": "application/json",
-          "Authorization": "Bearer ${Get.find<AuthController>().getUserToken()}",
-          "Access-Control-Allow-Origin": "*",
-          'Access-Control-Allow-Methods':"PUT, GET, POST, DELETE, OPTIONS"
-        },
-      ));
-
-      if(driverTripCompleted.currentStatus ==  null){
-        driverTripCompleted.subscribe();
-        driverTripCompleted.bind("driver-trip-completed.$tripId").listen((event) {
-
-          print('======driver-trip-completed');
-          Get.find<SafetyAlertController>().cancelDriverNeedSafetyStream();
-          // Get.find<RideController>().getCurrentRide();
-          Get.dialog(
-            const ConfirmationTripDialog(isStartedTrip: false),
-            barrierDismissible: false,
-          );
-          Get.find<RideController>().getFinalFare(jsonDecode(event.data!)['id']?.toString()??'').then((value) {
-            if (value.statusCode == 200) {
-              Get.find<RideController>().updateRideCurrentState(RideState.completeRide);
-              Get.find<MapController>().notifyMapController();
-              Get.back();
-              Get.off(() => RidePaymentScreen(rideId: jsonDecode(event.data!)['id']?.toString()??''));
-            }
-          });
-
-        });
-      }
-
-
-
-      driverPaymentReceived = pusherClient!.privateChannel("private-driver-payment-received.$tripId", authorizationDelegate:
-      EndpointAuthorizableChannelTokenAuthorizationDelegate.forPrivateChannel(
-        authorizationEndpoint: Uri.parse('${AppConstants.baseUrl}${AppConstants.pusherBroadcustUrl}'),
-        // authorizationEndpoint: Uri.parse('https://${Get.find<SplashController>().configModel!.webSocketUri}/broadcasting/auth'),
-        headers:  {
-          "Accept": "application/json",
-          "Authorization": "Bearer ${Get.find<AuthController>().getUserToken()}",
-          "Access-Control-Allow-Origin": "*",
-          'Access-Control-Allow-Methods':"PUT, GET, POST, DELETE, OPTIONS"
-        },
-      ));
-      if(driverPaymentReceived.currentStatus == null){
-        driverPaymentReceived.subscribe();
-        driverPaymentReceived.bind("driver-payment-received.$tripId").listen((event) {
-          if(Get.find<SplashController>().configModel!.reviewStatus?? false){
-            if(jsonDecode(event.data!)['type']== 'ride_request' && Get.find<SplashController>().configModel!.reviewStatus!){
-              Get.off(() => RidePaymentScreen(rideId: jsonDecode(event.data!)['id']?.toString()??''));
-
-              // Get.off(()=> ReviewScreen(tripId: jsonDecode(event.data!)['id']));
-            }
-            Get.find<RideController>().tripDetails = null;
-          }else{
-            // Get.offAllNamed(RouteHelper.getInitialRoute());
-            Get.offAll(() => RideOrderCompleteScreen(tripId: jsonDecode(event.data!)['id']?.toString()??''));
-            Get.find<RideController>().tripDetails = null;
-          }
-        });
-      }
+    final payments = _client!.privateChannel(
+      ShopperRealtimeContract.paymentChannel(customerId),
+      authorizationDelegate: authorization,
+    );
+    _channels.add(payments);
+    if (onPaymentUpdated != null) {
+      _subscriptions.add(
+        payments.bind('payment.status.updated').listen((event) {
+          final payload = _decodePayload(event.data);
+          if (payload != null) onPaymentUpdated(payload);
+        }),
+      );
     }
 
+    orders.subscribeIfNotUnsubscribed();
+    payments.subscribeIfNotUnsubscribed();
+    return true;
   }
 
+  static Future<void> disconnect() async {
+    for (final channel in _channels) {
+      channel.unsubscribe();
+    }
+    _channels.clear();
 
-  void pusherDisconnectPusher(){
-    publicChannel?.unsubscribe();
-    pusherClient?.disconnect();
+    for (final subscription in _subscriptions) {
+      await subscription.cancel();
+    }
+    _subscriptions.clear();
+
+    await _client?.disconnect();
+    _client = null;
+    _setConnectionStatus(null);
   }
 
+  static Map<String, dynamic>? _decodePayload(String? data) {
+    if (data == null || data.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(data);
+      return decoded is Map
+          ? decoded.map((key, value) => MapEntry(key.toString(), value))
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
-}
-
-class RecordLocationBodyModel {
-  String? latitude;
-  String? longitude;
-  String? location;
-
-  RecordLocationBodyModel({this.latitude, this.longitude, this.location});
+  static void _setConnectionStatus(String? status) {
+    try {
+      Get.find<SplashController>().setPusherStatus(status);
+    } catch (_) {
+      // Splash dependencies are not available in isolated contract tests.
+    }
+  }
 }
