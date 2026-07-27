@@ -31,6 +31,29 @@ void main() {
     },
   );
 
+  test('live compensation events are off until separately certified', () {
+    expect(
+      DriverRealtimeContract.compensationEventsEnabled,
+      isFalse,
+      reason: 'the compensation engine is undeployed; the payment channel '
+          'must not go live merely because Pusher credentials were installed',
+    );
+
+    // Not subscribed at all, rather than subscribed and ignored: the app
+    // must not even authorize the payment channel while the gate is off.
+    final source = File(
+      'lib/services/driver_realtime_service.dart',
+    ).readAsStringSync();
+    final gateIndex = source.indexOf('compensationEventsEnabled)');
+    final paymentChannelUse = source.indexOf('paymentChannel(driverId)');
+    expect(gateIndex, greaterThan(-1));
+    expect(
+      paymentChannelUse,
+      greaterThan(gateIndex),
+      reason: 'the payment channel must only be constructed inside the gate',
+    );
+  });
+
   test('driver realtime fails closed and contains no unsafe defaults', () {
     expect(DriverRealtimeContract.isConfigured, isFalse);
 

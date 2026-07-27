@@ -154,6 +154,53 @@ void main() {
       expect(parsed.totalLabel, 'Final total');
     });
 
+    test('accepted is distinct from both estimate and final', () {
+      final parsed = DriverCompensation.tryParse({
+        'total_cents': 5000,
+        'compensation_status': 'accepted',
+      })!;
+      expect(parsed.stage, CompensationStage.accepted);
+      expect(parsed.totalLabel, 'Accepted total');
+      expect(
+        parsed.isSettled,
+        isFalse,
+        reason: 'an accepted figure can still move; it is not settled pay',
+      );
+    });
+
+    test('adjusted is visible as adjusted, not silently shown as final', () {
+      final parsed = DriverCompensation.tryParse({
+        'total_cents': 4500,
+        'compensation_status': 'adjusted',
+      })!;
+      expect(parsed.stage, CompensationStage.adjusted);
+      expect(parsed.totalLabel, 'Adjusted total');
+      expect(parsed.isSettled, isTrue);
+    });
+
+    test('all four stages map to four distinct labels', () {
+      String labelFor(String raw) => DriverCompensation.tryParse({
+        'total_cents': 1,
+        'compensation_status': raw,
+      })!.totalLabel;
+
+      final labels = [
+        labelFor('estimate'),
+        labelFor('accepted'),
+        labelFor('final'),
+        labelFor('adjusted'),
+      ];
+      expect(labels.toSet(), hasLength(4));
+    });
+
+    test('an unrecognised stage is unknown and not treated as settled', () {
+      final parsed = DriverCompensation.tryParse({
+        'total_cents': 5000,
+        'compensation_status': 'some_future_state',
+      })!;
+      expect(parsed.isSettled, isFalse);
+    });
+
     test('an unrecognised stage is unknown, not final', () {
       final parsed = DriverCompensation.tryParse({
         'total_cents': 5000,

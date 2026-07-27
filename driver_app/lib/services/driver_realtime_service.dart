@@ -17,6 +17,19 @@ class DriverRealtimeContract {
   static bool get isConfigured =>
       appKey.trim().isNotEmpty && cluster.trim().isNotEmpty;
 
+  /// Whether to subscribe to live compensation/payment events.
+  ///
+  /// Deliberately separate from [isConfigured] and default false. Realtime
+  /// as a whole and *compensation over realtime* are two different
+  /// certifications: assignment events can be certified and switched on
+  /// while the compensation engine is still undeployed. Without this flag
+  /// the payment channel would go live the moment Pusher credentials were
+  /// installed, pushing figures the backend cannot yet compute.
+  static const bool compensationEventsEnabled = bool.fromEnvironment(
+    'UG_REALTIME_COMPENSATION_ENABLED',
+    defaultValue: false,
+  );
+
   static String get authorizationEndpoint =>
       '${ApiConfig.baseUrl}/api/v1/realtime/driver/broadcasting/auth';
 
@@ -101,11 +114,7 @@ class DriverRealtimeService {
       DriverRealtimeContract.assignmentsChannel(driverId),
       authorizationDelegate: authorization,
     );
-    final payments = client.privateChannel(
-      DriverRealtimeContract.paymentChannel(driverId),
-      authorizationDelegate: authorization,
-    );
-    _channels.addAll([assignments, payments]);
+    _channels.add(assignments);
 
     _subscriptions.add(
       assignments.bind('driver.assignment.updated').listen((event) {
@@ -113,12 +122,24 @@ class DriverRealtimeService {
         if (payload != null) onAssignmentUpdated(payload);
       }),
     );
-    _subscriptions.add(
-      payments.bind('payment.status.updated').listen((event) {
-        final payload = _decodePayload(event.data);
-        if (payload != null) onPaymentUpdated(payload);
-      }),
-    );
+
+    // The compensation/payment channel is not subscribed at all until it is
+    // certified. Not subscribing is stronger than subscribing and ignoring:
+    // the app never authorizes the channel and never receives a figure the
+    // compensation engine cannot yet produce.
+    if (DriverRealtimeContract.compensationEventsEnabled) {
+      final payments = client.privateChannel(
+        DriverRealtimeContract.paymentChannel(driverId),
+        authorizationDelegate: authorization,
+      );
+      _channels.add(payments);
+      _subscriptions.add(
+        payments.bind('payment.status.updated').listen((event) {
+          final payload = _decodePayload(event.data);
+          if (payload != null) onPaymentUpdated(payload);
+        }),
+      );
+    }
     _subscriptions.add(
       client.onConnectionEstablished.listen((_) {
         for (final channel in _channels) {
@@ -128,8 +149,9 @@ class DriverRealtimeService {
     );
 
     await client.connect();
-    assignments.subscribeIfNotUnsubscribed();
-    payments.subscribeIfNotUnsubscribed();
+    for (final channel in _channels) {
+      channel.subscribeIfNotUnsubscribed();
+    }
     return true;
   }
 

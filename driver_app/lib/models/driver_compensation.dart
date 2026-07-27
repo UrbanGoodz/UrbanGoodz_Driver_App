@@ -26,13 +26,26 @@
 ///    an empty breakdown, and it does not show `$0.00`.
 library;
 
-/// Whether the amounts describe an estimate or a settled figure.
+/// How settled the amounts are.
+///
+/// Ordered by how much the driver can rely on the figure. The distinction
+/// matters because a driver who reads an estimate as final pay has been
+/// misled, and one who reads an adjusted figure as unchanged has lost the
+/// signal that support altered it.
 enum CompensationStage {
   /// Backend has computed a projection; the figure can still move.
   estimate,
 
+  /// The driver accepted the job at this figure. Still not settled, but no
+  /// longer a bare projection.
+  accepted,
+
   /// Backend has settled the job; the figure will not move again.
   settled,
+
+  /// Settled, then changed afterwards by an adjustment. Distinct from
+  /// [settled] so the change is visible rather than silent.
+  adjusted,
 
   /// The backend did not say. Treated as unknown, never as settled.
   unknown,
@@ -175,9 +188,16 @@ class DriverCompensation {
   /// settled pay.
   String get totalLabel => switch (stage) {
     CompensationStage.estimate => 'Estimated total',
+    CompensationStage.accepted => 'Accepted total',
     CompensationStage.settled => 'Final total',
+    CompensationStage.adjusted => 'Adjusted total',
     CompensationStage.unknown => 'Total',
   };
+
+  /// True only when the backend says the figure will not move again.
+  /// [adjusted] counts: it is settled, just settled at a changed figure.
+  bool get isSettled =>
+      stage == CompensationStage.settled || stage == CompensationStage.adjusted;
 
   String get payoutLabel => switch (payoutStatus) {
     PayoutStatus.pending => 'Payout pending',
@@ -223,7 +243,11 @@ class DriverCompensation {
         .toLowerCase();
     return switch (raw) {
       'estimate' || 'estimated' || 'projected' => CompensationStage.estimate,
+      'accepted' || 'agreed' => CompensationStage.accepted,
       'final' || 'settled' => CompensationStage.settled,
+      'adjusted' || 'amended' || 'corrected' => CompensationStage.adjusted,
+      // An unrecognised stage is never promoted to settled: a driver must
+      // not read an unknown state as pay they can count on.
       _ => CompensationStage.unknown,
     };
   }
