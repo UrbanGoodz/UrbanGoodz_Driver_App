@@ -52,11 +52,28 @@ class _SignInViewState extends State<SignInView> {
     SplashController splashController = Get.find<SplashController>();
 
     WidgetsBinding.instance.addPostFrameCallback((_){
+      // Pre-filling the form is a convenience, not a precondition for showing
+      // it. When the backend config is missing there is nothing to pre-fill
+      // against, so skip it -- build() renders the unavailable state. Throwing
+      // here previously took the whole login screen down with it.
+      final centralizeLoginSetup =
+          splashController.configModel?.centralizeLoginSetup;
+      if (centralizeLoginSetup == null) {
+        return;
+      }
+
       CentralizeLoginType loginType = CentralizeLoginHelper.getPreferredLoginMethod(
-        splashController.configModel!.centralizeLoginSetup!, authController.isOtpViewEnable,
+        centralizeLoginSetup, authController.isOtpViewEnable,
       ).type;
 
       bool isOtpActive = loginType == CentralizeLoginType.otp || loginType == CentralizeLoginType.otpAndSocial;
+
+      // Falls back to an empty dial code rather than asserting on country:
+      // an absent country must not crash a screen the shopper needs.
+      final configCountry = splashController.configModel?.country;
+      final defaultDialCode = configCountry == null
+          ? ''
+          : CountryCode.fromCountryCode(configCountry).dialCode ?? '';
 
       if (isOtpActive) {
         // Pre-fill from OTP-specific storage
@@ -64,7 +81,7 @@ class _SignInViewState extends State<SignInView> {
         String otpCountryCode = authController.getOtpUserCountryCode();
         _countryDialCode = otpCountryCode.isNotEmpty
             ? otpCountryCode
-            : CountryCode.fromCountryCode(splashController.configModel!.country!).dialCode;
+            : defaultDialCode;
         _phoneController.text = otpNumber;
       } else {
         // Pre-fill from manual-specific storage
@@ -72,7 +89,7 @@ class _SignInViewState extends State<SignInView> {
         String manualCountryCode = authController.getUserCountryCode();
         _countryDialCode = manualCountryCode.isNotEmpty
             ? manualCountryCode
-            : CountryCode.fromCountryCode(splashController.configModel!.country!).dialCode;
+            : defaultDialCode;
         _phoneController.text = manualNumber;
         _passwordController.text = authController.getUserPassword();
       }
@@ -116,12 +133,63 @@ class _SignInViewState extends State<SignInView> {
       }
       _prevOtpViewEnable = authController.isOtpViewEnable;
 
+      // Which login methods to offer comes from the backend config. When that
+      // config did not load -- offline start, slow network, backend hiccup --
+      // this used to force-unwrap and throw, replacing the whole login screen
+      // with a crash. A shopper who cannot reach config must still see a
+      // screen that explains itself and offers a retry.
+      final centralizeLoginSetup =
+          Get.find<SplashController>().configModel?.centralizeLoginSetup;
+      if (centralizeLoginSetup == null) {
+        return _signInUnavailable();
+      }
+
       return Form(
         key: _formKeyLogin,
-        child: activeCentralizeLogin(Get.find<SplashController>().configModel!.centralizeLoginSetup!, authController),
+        child: activeCentralizeLogin(centralizeLoginSetup, authController),
       );
     });
   }
+
+  /// Shown when the backend sign-in configuration is not available.
+  ///
+  /// Deliberately states the real reason and offers a retry rather than
+  /// rendering an empty form that could not submit anyway.
+  Widget _signInUnavailable() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+          const SizedBox(height: 16),
+          // Literal rather than .tr: these two keys are not in the shipped
+          // language assets, and GetX renders a missing key as the raw key
+          // name, which would put "sign_in_is_temporarily_unavailable" on
+          // screen. English text is the honest fallback until the keys are
+          // added to every locale file.
+          const Text(
+            'Sign-in is temporarily unavailable',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'We could not load the sign-in settings. Check your connection '
+            'and try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () =>
+                Get.find<SplashController>().getConfigData(),
+            child: Text('retry'.tr),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget activeCentralizeLogin(CentralizeLoginSetup centralizeLoginSetup, AuthController authController) {
     CentralizeLoginType centralizeLogin = CentralizeLoginHelper.getPreferredLoginMethod(centralizeLoginSetup, authController.isOtpViewEnable).type;
