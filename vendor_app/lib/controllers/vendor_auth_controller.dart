@@ -4,25 +4,32 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_goodz_vendor/repositories/vendor_repository.dart';
 import 'package:urban_goodz_vendor/services/vendor_api_client.dart';
+import 'package:urban_goodz_vendor/services/vendor_realtime_service.dart';
+import 'package:urban_goodz_vendor/controllers/dashboard_controller.dart';
+import 'package:urban_goodz_vendor/controllers/orders_controller.dart';
+import 'package:urban_goodz_vendor/controllers/revenue_tracking_controller.dart';
 import 'dart:async';
 
 class VendorAuthController extends GetxController {
-  VendorAuthController(this.repository, this.api);
+  VendorAuthController(this.repository, this.api, [this.realtime]);
 
   static const _tokenKey = 'vendor_api_token';
   static const _emailKey = 'vendor_email';
 
   final VendorRepository repository;
   final VendorApiClient api;
+  final VendorRealtimeService? realtime;
 
   final isLoggedIn = false.obs;
   final isInitialized = false.obs;
   final isLoading = false.obs;
   final errorMessage = RxnString();
+
   /// One of: unknown | approved | pending | suspended | store_missing |
   /// denied | subscription_required. Every value maps to a state the backend
   /// actually emits; none is invented.
   final approvalStatus = 'unknown'.obs;
+  final vendorId = 0.obs;
 
   /// True when the backend answered 200 with a `subscribed` payload instead
   /// of a usable session (store_business_model == 'none').
@@ -38,6 +45,7 @@ class VendorAuthController extends GetxController {
   final storeStatus = 'closed'.obs;
   final sizingQuoteRequests = <FashionFitQuoteRequest>[].obs;
   StreamSubscription<String>? _tokenRefreshSubscription;
+  String _sessionToken = '';
 
   @override
   void onInit() {
@@ -70,10 +78,12 @@ class VendorAuthController extends GetxController {
       final token = preferences.getString(_tokenKey);
       email.value = preferences.getString(_emailKey) ?? '';
       if (token != null && token.isNotEmpty) {
+        _sessionToken = token;
         api.setToken(token);
         try {
           await refreshProfile().timeout(const Duration(seconds: 15));
           isLoggedIn.value = true;
+          await _connectRealtime();
           await _registerFcmToken();
         } on VendorApiException catch (error) {
           if (error.statusCode == 401 || error.statusCode == 403) {
@@ -159,6 +169,7 @@ class VendorAuthController extends GetxController {
         );
       }
       api.setToken(token);
+      _sessionToken = token;
       final preferences = await SharedPreferences.getInstance();
       await preferences.setString(_tokenKey, token);
       await preferences.setString(_emailKey, emailAddress.trim());
@@ -168,6 +179,7 @@ class VendorAuthController extends GetxController {
       await refreshProfile();
       approvalStatus.value = 'approved';
       isLoggedIn.value = true;
+      await _connectRealtime();
       await _registerFcmToken();
       return true;
     } on VendorApiException catch (error) {
@@ -187,6 +199,7 @@ class VendorAuthController extends GetxController {
 
   Future<void> refreshProfile() async {
     final profile = await repository.profile();
+    vendorId.value = int.tryParse(profile['id']?.toString() ?? '') ?? 0;
     final storeValue = profile['stores'];
     final store = storeValue is Map
         ? Map<String, dynamic>.from(storeValue)
@@ -286,12 +299,38 @@ class VendorAuthController extends GetxController {
   }
 
   Future<void> _clearSession() async {
+    await realtime?.disconnect();
     api.setToken(null);
+    _sessionToken = '';
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_tokenKey);
     businessName.value = '';
     ownerName.value = '';
+    vendorId.value = 0;
     sizingQuoteRequests.clear();
+  }
+
+  Future<void> _connectRealtime() async {
+    await realtime?.connect(
+      vendorId: vendorId.value,
+      bearerToken: _sessionToken,
+      onOrderUpdated: (_) {
+        if (Get.isRegistered<OrdersController>()) {
+          unawaited(Get.find<OrdersController>().fetchOrders());
+        }
+        if (Get.isRegistered<DashboardController>()) {
+          unawaited(Get.find<DashboardController>().fetchDashboard());
+        }
+      },
+      onPaymentUpdated: (_) {
+        if (Get.isRegistered<RevenueTrackingController>()) {
+          unawaited(Get.find<RevenueTrackingController>().fetchRevenue());
+        }
+        if (Get.isRegistered<DashboardController>()) {
+          unawaited(Get.find<DashboardController>().fetchDashboard());
+        }
+      },
+    );
   }
 
   static bool _bool(Object? value) =>

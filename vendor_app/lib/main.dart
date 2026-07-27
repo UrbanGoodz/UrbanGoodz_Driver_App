@@ -7,6 +7,7 @@ import 'package:urban_goodz_vendor/screens/vendor_onboarding_screen.dart';
 import 'package:urban_goodz_vendor/theme/app_theme.dart';
 import 'package:urban_goodz_vendor/repositories/vendor_repository.dart';
 import 'package:urban_goodz_vendor/services/vendor_api_client.dart';
+import 'package:urban_goodz_vendor/services/vendor_realtime_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,9 +23,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final api = Get.put(VendorApiClient(), permanent: true);
+    final realtime = Get.put(VendorRealtimeService(), permanent: true);
     Get.put(VendorRepository(api), permanent: true);
     final authController = Get.put(
-      VendorAuthController(Get.find<VendorRepository>(), api),
+      VendorAuthController(Get.find<VendorRepository>(), api, realtime),
       permanent: true,
     );
     return Obx(() {
