@@ -31,7 +31,7 @@
     </queries>
 
     <application
-        android:label="Urban Goodz"
+        android:label="Urban Goodz Shopper"
         android:name="${applicationName}"
         android:extractNativeLibs="true"
         android:requestLegacyExternalStorage="true"

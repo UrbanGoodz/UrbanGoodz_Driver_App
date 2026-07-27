@@ -54,7 +54,14 @@ android {
 
     buildTypes {
         getByName("release") {
-            signingConfig = signingConfigs.getByName("debug") // or "release" if you have real keystore
+            // Release builds must use the Urban Goodz Shopper upload key. Fall back to the
+            // debug key only when key.properties is absent, so contributors without the
+            // keystore can still build locally; such a build is not a release candidate.
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
