@@ -1,3 +1,5 @@
+import 'package:urban_goodz_driver/models/driver_compensation.dart';
+
 class BusinessJobModel {
   final int jobId;
   final String jobNumber;
@@ -17,6 +19,14 @@ class BusinessJobModel {
   final JobProof proof;
   final bool hasException;
 
+  /// Driver compensation as computed by the backend, or `null` when the
+  /// backend sent none. Null is the signal to display
+  /// [DriverCompensation.unavailableMessage] rather than a zero total.
+  ///
+  /// The compensation engine is not deployed yet, so in production this is
+  /// currently always null. That is the intended behaviour, not a defect.
+  final DriverCompensation? compensation;
+
   BusinessJobModel({
     required this.jobId,
     required this.jobNumber,
@@ -35,6 +45,7 @@ class BusinessJobModel {
     required this.exception,
     required this.proof,
     required this.hasException,
+    this.compensation,
   });
 
   factory BusinessJobModel.fromJson(Map<String, dynamic> j) {
@@ -58,6 +69,7 @@ class BusinessJobModel {
       exception: JobException.fromJson(j['exception'] ?? {}),
       proof: JobProof.fromJson(j['proof'] ?? {}),
       hasException: j['exception']?['has_exception'] == true,
+      compensation: DriverCompensation.tryParse(j),
     );
   }
 
