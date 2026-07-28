@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/config/api_config.dart';
 import 'package:urban_goodz_driver/services/api_client.dart';
@@ -544,15 +546,105 @@ class DriverApiService extends GetxService {
 
   // ---------- Order Anywhere Purchase Card ----------
 
+  /// GET .../order-anywhere/{id}/purchase-card
+  ///
+  /// Returns the **whole** envelope, not just `data`. The provider-pending and
+  /// pre-issuance responses carry `card_status`, `workflow_status` and
+  /// `provider_configuration_status` at the top level with a null `data`;
+  /// unwrapping to `data` here would discard exactly the fields the driver
+  /// needs to be told why no card exists yet.
+  ///
+  /// 401 : session expired — surfaces via ApiClient.onUnauthorized
+  /// 403 : caller is not the currently assigned driver
+  /// 404 : order not found
   Future<Map<String, dynamic>> getPurchaseCard(int requestId) async {
     final body = await _ok(
       await _client.authGet(
         '${ApiConfig.driverApiPrefix}/order-anywhere/$requestId/purchase-card',
       ),
     );
-    return body is Map && body['data'] != null
+    return body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
+  }
+
+  /// POST .../purchase-card/secure-reveal
+  ///
+  /// Asks the backend to mint a short-lived provider-hosted reveal session.
+  /// Only ever called when the card is live and the provider is configured —
+  /// the caller gates this, so a provider-unconfigured build never issues a
+  /// placeholder request. Throttled server-side at 10/min.
+  ///
+  /// Returns `{reveal_url, expires_at}`. No card credentials are returned.
+  Future<Map<String, dynamic>> createCardRevealSession(int requestId) async {
+    final body = await _ok(
+      await _client.authPost(
+        '${ApiConfig.driverApiPrefix}/order-anywhere/$requestId/purchase-card/secure-reveal',
+        const <String, dynamic>{},
+      ),
+    );
+    return body is Map && body['data'] is Map
         ? Map<String, dynamic>.from(body['data'])
-        : {};
+        : <String, dynamic>{};
+  }
+
+  /// POST .../purchase-card/receipt (multipart)
+  ///
+  /// [receiptPath] must be a jpg/jpeg/png/webp/pdf under 5 MB — the backend
+  /// rejects anything else with 422. The request id is part of the path, so a
+  /// receipt cannot be posted against a different assignment.
+  Future<Map<String, dynamic>> uploadPurchaseReceipt(
+    int requestId, {
+    required String receiptPath,
+    required double receiptTotal,
+    String? notes,
+  }) async {
+    final form = FormData({
+      'receipt': MultipartFile(
+        File(receiptPath),
+        filename: _basename(receiptPath),
+      ),
+      'receipt_total': receiptTotal.toStringAsFixed(2),
+      if (notes != null && notes.trim().isNotEmpty) 'receipt_notes': notes.trim(),
+    });
+
+    final body = await _ok(
+      await _client.authPost(
+        '${ApiConfig.driverApiPrefix}/order-anywhere/$requestId/purchase-card/receipt',
+        form,
+      ),
+    );
+    return body is Map && body['data'] is Map
+        ? Map<String, dynamic>.from(body['data'])
+        : <String, dynamic>{};
+  }
+
+  /// Filename only — never the containing directory, so the upload does not
+  /// leak the device's local filesystem layout to the server.
+  static String _basename(String path) {
+    final normalised = path.replaceAll('\\', '/');
+    final index = normalised.lastIndexOf('/');
+    return index == -1 ? normalised : normalised.substring(index + 1);
+  }
+
+  /// POST .../purchase-card/failure
+  ///
+  /// [category] must already be one of the backend's six accepted values; the
+  /// driver-facing wording travels in [details]. Callers must never place card
+  /// credentials, provider tokens or reveal URLs in [details].
+  Future<void> reportPurchaseCardFailure(
+    int requestId, {
+    required String category,
+    String? details,
+  }) async {
+    await _ok(
+      await _client.authPost(
+        '${ApiConfig.driverApiPrefix}/order-anywhere/$requestId/purchase-card/failure',
+        {
+          'category': category,
+          if (details != null && details.trim().isNotEmpty)
+            'details': details.trim(),
+        },
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> authorizePurchaseCard(
