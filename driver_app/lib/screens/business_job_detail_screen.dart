@@ -71,17 +71,18 @@ class _BusinessJobDetailScreenState extends State<BusinessJobDetailScreen> {
           _rateCard(job),
           const SizedBox(height: 12),
           _compensationCard(job),
-          if (job.jobType == 'order_anywhere') ...[
+          if (job.showsPurchaseCard) ...[
             const SizedBox(height: 12),
             Card(
+              key: const Key('purchase_card_entry'),
               child: ListTile(
                 leading: const Icon(Icons.credit_card, color: AppTheme.primary),
                 title: const Text(
-                  'Virtual Purchase Card',
+                  'Purchase Card',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text(
-                  'Use virtual card for purchase authorization',
+                  'View card status, submit your receipt, or report a problem',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () =>

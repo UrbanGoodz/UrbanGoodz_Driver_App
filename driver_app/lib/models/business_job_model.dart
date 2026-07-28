@@ -1,4 +1,5 @@
 import 'package:urban_goodz_driver/models/driver_compensation.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 
 class BusinessJobModel {
   final int jobId;
@@ -47,6 +48,19 @@ class BusinessJobModel {
     required this.hasException,
     this.compensation,
   });
+
+  /// Whether the Order Anywhere purchase-card section belongs on this job.
+  ///
+  /// Three conditions, all required. The job must be an Order Anywhere job —
+  /// no other job type has a purchase card. It must be one the driver actually
+  /// holds, which the driver-scoped `business-jobs` endpoint guarantees by
+  /// only returning this driver's work. And it must not be cancelled or
+  /// failed: the backend refuses card actions on those with a 422, so offering
+  /// the section would only lead the driver into a dead end.
+  bool get showsPurchaseCard {
+    if (jobType != 'order_anywhere') return false;
+    return status != JobStatus.cancelled && status != JobStatus.failed;
+  }
 
   factory BusinessJobModel.fromJson(Map<String, dynamic> j) {
     return BusinessJobModel(
