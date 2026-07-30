@@ -7,6 +7,7 @@ import 'package:urban_goodz_driver/services/driver_api_service.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 import 'package:urban_goodz_driver/screens/driver_registration_screen.dart';
 import 'package:urban_goodz_driver/screens/dashboard_screen.dart';
+import 'package:urban_goodz_driver/theme/ug_brand.dart';
 
 class DriverOnboardingScreen extends StatefulWidget {
   const DriverOnboardingScreen({super.key});
@@ -227,74 +228,22 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
                   children: [
-                    // Brand Header & Logo Treatment
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'UG',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.dark,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Flexible so the wordmark shrinks rather than
-                        // overflowing on narrow phones and at large text
-                        // scales — the subtitle is wide (24 characters with
-                        // 1.8px letter spacing).
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Semantics(
-                                label: 'driver_brand_title',
-                                child: Text(
-                                  'URBAN GOODZ',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.dark,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ),
-                              Semantics(
-                                label: 'driver_brand_subtitle',
-                                child: Text(
-                                  'DRIVER PARTNER LOGISTICS',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.primary,
-                                    letterSpacing: 1.8,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    // Brand Header — the real Urban Goodz wordmark and app
+                    // mark. This previously drew the letters 'UG' in an
+                    // orange box, which is not the brand.
+                    Semantics(
+                      label: 'driver_brand_header',
+                      container: true,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          UgBrand.appMarkImage(size: 72),
+                          const SizedBox(height: 14),
+                          UgBrand.wordmarkImage(width: 190),
+                          const SizedBox(height: 10),
+                          UgBrand.roleLabel('Driver Partner Logistics'),
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 16),
