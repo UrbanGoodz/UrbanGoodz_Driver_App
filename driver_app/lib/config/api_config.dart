@@ -9,6 +9,27 @@ class ApiConfig {
   static const String recordLocation =
       '/api/v1/delivery-man/record-location-data';
 
+  // Marketplace orders (restaurant, grocery, retail, home-based, pharmacy).
+  // These are the canonical delivery-man endpoints the backend has always
+  // exposed; the Urban Goodz driver app previously shipped without them, so a
+  // driver could not confirm, pick up or deliver a marketplace order at all.
+  static const String marketplaceCurrentOrders =
+      '/api/v1/delivery-man/current-orders';
+  static const String marketplaceLatestOrders =
+      '/api/v1/delivery-man/latest-orders';
+  static const String marketplaceAllOrders = '/api/v1/delivery-man/all-orders';
+  static const String marketplaceOrderDetails =
+      '/api/v1/delivery-man/order-details';
+  static const String marketplaceOrder = '/api/v1/delivery-man/order';
+  static const String marketplaceAcceptOrder =
+      '/api/v1/delivery-man/accept-order';
+  static const String marketplaceUpdateOrderStatus =
+      '/api/v1/delivery-man/update-order-status';
+  static const String marketplaceSendOrderOtp =
+      '/api/v1/delivery-man/send-order-otp';
+  static const String marketplaceOrderDeliveryHistory =
+      '/api/v1/delivery-man/order-delivery-history';
+
   // Business Courier (9)
   static const String businessJobs = '$driverApiPrefix/business-jobs';
   static String businessJobDetail(int jobId) =>

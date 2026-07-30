@@ -20,6 +20,7 @@ import 'package:urban_goodz_driver/screens/vehicle_requirements_screen.dart';
 import 'package:urban_goodz_driver/screens/dedicated_route_list_screen.dart';
 import 'package:urban_goodz_driver/screens/driver_ai_assistant_screen.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
+import 'package:urban_goodz_driver/screens/marketplace_orders_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<Widget> _screens = const [
     _DashboardBody(),
+    MarketplaceOrdersScreen(),
     ActiveJobsScreen(),
     EarningsScreen(),
     _ProfilePlaceholder(),
@@ -76,6 +78,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard),
               label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.storefront),
+              label: 'Deliveries',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),

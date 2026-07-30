@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_vendor/controllers/vendor_auth_controller.dart';
 import 'package:urban_goodz_vendor/theme/app_theme.dart';
+import 'package:urban_goodz_vendor/theme/ug_brand.dart';
 import 'package:urban_goodz_vendor/screens/vendor_registration_screen.dart';
 import 'package:urban_goodz_vendor/screens/dashboard_screen.dart';
 import 'package:urban_goodz_vendor/screens/vendor_password_reset_screen.dart';
@@ -150,59 +151,14 @@ class _VendorOnboardingScreenState extends State<VendorOnboardingScreen> {
                       identifier: 'vendor_login_branding',
                       label: 'vendor_login_branding',
                       container: true,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'UG',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.dark,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'URBAN GOODZ',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.dark,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                              Text(
-                                'Urban Goodz Vendor',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.primary,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
+                          UgBrand.appMarkImage(size: 72),
+                          const SizedBox(height: 14),
+                          UgBrand.wordmarkImage(width: 190),
+                          const SizedBox(height: 10),
+                          UgBrand.roleLabel('Vendor Portal'),
                         ],
                       ),
                     ),
