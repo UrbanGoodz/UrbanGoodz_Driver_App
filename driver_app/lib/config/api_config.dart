@@ -6,6 +6,7 @@ class ApiConfig {
   static const String driverLogin = '/api/v1/auth/delivery-man/login';
   static const String updateFcmToken = '/api/v1/delivery-man/update-fcm-token';
   static const String driverProfile = '/api/v1/delivery-man/profile';
+  static const String driverLogout = '/api/v1/delivery-man/logout';
   static const String recordLocation =
       '/api/v1/delivery-man/record-location-data';
 

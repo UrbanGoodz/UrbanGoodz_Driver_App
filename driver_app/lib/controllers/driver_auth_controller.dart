@@ -192,6 +192,15 @@ class DriverAuthController extends GetxController {
   /// navigated immediately, so the token could still be on disk when the app
   /// was killed mid-logout — the next launch silently resumed the old session.
   Future<void> logout() async {
+    // Revoke the session on the server before dropping the local copy.
+    // Clearing only the handset left delivery_men.auth_token valid forever, so
+    // a lost or resold phone kept a working bearer and kept receiving this
+    // driver's assignments. Best-effort: if the call fails the local session is
+    // still torn down, because refusing to log out is the worse failure.
+    try {
+      await Get.find<DriverApiService>().logout();
+    } catch (_) {}
+
     await _endSession();
     Get.offAll(() => const DriverOnboardingScreen());
   }

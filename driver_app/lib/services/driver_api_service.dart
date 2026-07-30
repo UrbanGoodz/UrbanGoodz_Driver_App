@@ -844,4 +844,10 @@ class DriverApiService extends GetxService {
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
+
+  /// Ends the session server-side so the token stops working on a lost
+  /// device. The delivery-man API had no logout endpoint until now.
+  Future<void> logout() async {
+    await _client.authPost(ApiConfig.driverLogout, {});
+  }
 }
