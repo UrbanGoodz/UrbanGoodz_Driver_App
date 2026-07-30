@@ -124,6 +124,9 @@ class MarketplaceOrder {
   String? get nextDriverStatus {
     switch (orderStatus) {
       case 'pending':
+      // `accept-order` moves an unassigned order to `accepted`, which is a
+      // distinct state from `pending` — the driver still owes a confirmation.
+      case 'accepted':
         return 'confirmed';
       case 'confirmed':
       case 'processing':

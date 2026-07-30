@@ -11,7 +11,10 @@ class CapabilityScreen extends StatefulWidget {
 }
 
 class _CapabilityScreenState extends State<CapabilityScreen> {
-  final CapabilityController controller = Get.find<CapabilityController>();
+  // Registered here rather than looked up: nothing else in the app puts this
+  // controller, so Get.find threw and the screen rendered blank. Matches the
+  // pattern the other quick-action screens already use.
+  final CapabilityController controller = Get.put(CapabilityController());
 
   final _vehicleCtrl = TextEditingController();
   final _cargoNotesCtrl = TextEditingController();

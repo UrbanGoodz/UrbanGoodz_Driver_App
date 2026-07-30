@@ -12,7 +12,9 @@ class JobDiscoveryScreen extends StatefulWidget {
 }
 
 class _JobDiscoveryScreenState extends State<JobDiscoveryScreen> {
-  final JobDiscoveryController controller = Get.find<JobDiscoveryController>();
+  // Same blank-screen cause as CapabilityScreen: this controller was never
+  // registered, so Get.find threw before the first frame.
+  final JobDiscoveryController controller = Get.put(JobDiscoveryController());
 
   @override
   void initState() {
