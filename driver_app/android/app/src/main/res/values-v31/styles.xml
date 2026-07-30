@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ builds the launch screen from the SplashScreen API and ignores
+      drawable/launch_background.xml. Without this file the system falls back to
+      a bare window background, which is why the splash flashed white before the
+      Flutter splash painted. Setting the brand colour here makes the handover
+      to the Flutter splash seamless.
+
+      Android always masks the system splash icon. A transparent drawable keeps
+      the launcher icon from appearing as a circle-masked splash treatment; the
+      full, readable brand treatment is shown by the Flutter splash immediately
+      after the system launch window.
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/ug_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/transparent_splash_icon</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/ug_splash_background</item>
+    </style>
+
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/ug_splash_background</item>
+    </style>
+</resources>
