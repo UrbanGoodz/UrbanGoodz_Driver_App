@@ -29,7 +29,7 @@ class DriverApiService extends GetxService {
 
   /// POST /api/v1/auth/delivery-man/login  (verified live 2026-07-23)
   ///
-  /// Request : {"phone": <phone or email>, "password": <string>}
+  /// Request : {"phone": `phone or email`, "password": `string`}
   /// 200     : session payload containing the `token` used as `?token=`
   /// 401     : {"errors":[{"code":"auth-001","message":"Incorrect credential
   ///           please try again"}]} — also the envelope the backend uses to
@@ -58,6 +58,24 @@ class DriverApiService extends GetxService {
   Future<Map<String, dynamic>> getProfile() async {
     final body = await _ok(await _client.authGet(ApiConfig.driverProfile));
     return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
+  /// Zones the platform currently serves, for the preferred-zones selector.
+  ///
+  /// Read live rather than hard-coded, so adding a zone in admin makes it
+  /// selectable for drivers without an app release.
+  Future<List<ZoneOption>> getServiceZones() async {
+    final body = await _ok(await _client.authGet(ApiConfig.zoneList));
+    final List raw = body is List
+        ? body
+        : (body is Map && body['zones'] is List)
+        ? body['zones'] as List
+        : const [];
+    return raw
+        .whereType<Map>()
+        .map((z) => ZoneOption.fromJson(Map<String, dynamic>.from(z)))
+        .where((z) => z.isActive)
+        .toList();
   }
 
   // ---------- Business Courier (9) ----------
@@ -603,7 +621,8 @@ class DriverApiService extends GetxService {
         filename: _basename(receiptPath),
       ),
       'receipt_total': receiptTotal.toStringAsFixed(2),
-      if (notes != null && notes.trim().isNotEmpty) 'receipt_notes': notes.trim(),
+      if (notes != null && notes.trim().isNotEmpty)
+        'receipt_notes': notes.trim(),
     });
 
     final body = await _ok(
@@ -749,8 +768,8 @@ class DriverApiService extends GetxService {
         'barcode': barcode,
         'lat': lat,
         'lng': lng,
-        if (proofPhoto != null) 'proof_photo': proofPhoto,
-        if (signature != null) 'signature': signature,
+        'proof_photo': ?proofPhoto,
+        'signature': ?signature,
       }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
@@ -784,7 +803,7 @@ class DriverApiService extends GetxService {
     final body = await _ok(
       await _client.authPost(ApiConfig.aiRouteOptimization, {
         'route_id': routeId,
-        if (preference != null) 'preference': preference,
+        'preference': ?preference,
       }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
@@ -821,9 +840,8 @@ class DriverApiService extends GetxService {
         'photo': photoBase64,
         'gps_lat': lat,
         'gps_lng': lng,
-        if (recipientName != null) 'recipient_name': recipientName,
-        if (dropoffInstructions != null)
-          'dropoff_instructions': dropoffInstructions,
+        'recipient_name': ?recipientName,
+        'dropoff_instructions': ?dropoffInstructions,
       }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
@@ -839,7 +857,7 @@ class DriverApiService extends GetxService {
   Future<Map<String, dynamic>> getAiEarningsComparison({String? period}) async {
     final body = await _ok(
       await _client.authPost(ApiConfig.aiEarningsComparison, {
-        if (period != null) 'period': period,
+        'period': ?period,
       }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};

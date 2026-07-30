@@ -85,13 +85,35 @@ class CapabilityAllowedValues {
 
   factory CapabilityAllowedValues.fromJson(Map<String, dynamic> a) =>
       CapabilityAllowedValues(
-        vehicleTypes: List<String>.from(a['vehicle_types'] ?? []),
-        capabilityTags: List<String>.from(a['capability_tags'] ?? []),
-        preferredWorkTypes: List<String>.from(a['preferred_work_types'] ?? []),
-        availabilityPreferences: List<String>.from(
-          a['availability_preferences'] ?? [],
+        vehicleTypes: _options(a['vehicle_types']),
+        capabilityTags: _options(a['capability_tags']),
+        // The backend sends this as `work_types`; `preferred_work_types` is
+        // accepted too so either shape keeps working.
+        preferredWorkTypes: _options(
+          a['work_types'] ?? a['preferred_work_types'],
         ),
+        availabilityPreferences: _options(a['availability_preferences']),
       );
+
+  /// Reads an option list that the backend may send as either a JSON array or
+  /// a JSON object.
+  ///
+  /// Several of these are PHP associative arrays — VEHICLE_TYPES is
+  /// `['car' => 'Car', ...]` — so they serialise as objects keyed by the value
+  /// the API expects back. Passing one of those to `List.from` throws, because
+  /// a Map is not Iterable, and that single failure used to abort the whole
+  /// allowed-values parse and leave *every* dropdown on the capability screen
+  /// empty and unselectable.
+  static List<String> _options(dynamic raw) {
+    if (raw == null) return const [];
+    if (raw is Map) {
+      return raw.keys.map((k) => k.toString()).toList();
+    }
+    if (raw is Iterable) {
+      return raw.map((v) => v.toString()).toList();
+    }
+    return const [];
+  }
 }
 
 class CapabilitySummary {
@@ -103,6 +125,28 @@ class CapabilitySummary {
     final dm = s['dispatch_matching'] ?? {};
     return CapabilitySummary(
       canHandleMedicalCourier: dm['can_handle_medical_courier'] == true,
+    );
+  }
+}
+
+/// A service zone the driver can mark as preferred.
+///
+/// Sourced from the platform zone list so the selector grows automatically as
+/// new zones are opened, rather than being a hard-coded or free-text list.
+class ZoneOption {
+  final int? id;
+  final String name;
+  final bool isActive;
+
+  const ZoneOption({this.id, required this.name, this.isActive = true});
+
+  factory ZoneOption.fromJson(Map<String, dynamic> json) {
+    final dynamic status = json['status'];
+    return ZoneOption(
+      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}'),
+      name: (json['display_name'] ?? json['name'] ?? '').toString(),
+      isActive:
+          status == null || status == 1 || status == '1' || status == true,
     );
   }
 }

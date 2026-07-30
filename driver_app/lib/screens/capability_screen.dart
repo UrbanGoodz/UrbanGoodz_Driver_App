@@ -20,7 +20,9 @@ class _CapabilityScreenState extends State<CapabilityScreen> {
   final _cargoNotesCtrl = TextEditingController();
   final _maxPackagesCtrl = TextEditingController();
   final _maxWeightCtrl = TextEditingController();
-  final _zonesCtrl = TextEditingController();
+
+  /// Zone names the driver has selected, backed by the live zone list.
+  final Set<String> _selectedZones = <String>{};
   final _availCtrl = TextEditingController();
 
   bool _hasCargoSpace = false;
@@ -47,7 +49,9 @@ class _CapabilityScreenState extends State<CapabilityScreen> {
     _cargoNotesCtrl.text = p.cargoCapacityNotes ?? '';
     _maxPackagesCtrl.text = p.maxPackageCount?.toString() ?? '';
     _maxWeightCtrl.text = p.maxWeightLbs?.toString() ?? '';
-    _zonesCtrl.text = p.preferredZones.join(', ');
+    _selectedZones
+      ..clear()
+      ..addAll(p.preferredZones);
     _availCtrl.text = p.availabilityPreference;
     _hasCargoSpace = p.hasCargoSpace;
     _hasCoolerBag = p.hasCoolerBag;
@@ -181,23 +185,44 @@ class _CapabilityScreenState extends State<CapabilityScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _zonesCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Comma-separated, e.g. Houston, TX, Austin, TX',
-                  ),
+                // Pick from the zones the platform actually serves rather than
+                // typing them. The list comes from the zone endpoint, so it
+                // grows on its own as new zones are opened.
+                Builder(
+                  builder: (_) {
+                    final zones = controller.zoneOptions;
+                    if (zones.isEmpty) {
+                      return const Text(
+                        'Zone list unavailable right now. Pull to refresh to try again.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      );
+                    }
+                    final selected = _selectedZones;
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: zones.map((z) {
+                        final isOn = selected.contains(z.name);
+                        return FilterChip(
+                          label: Text(z.name),
+                          selected: isOn,
+                          onSelected: (on) => setState(() {
+                            if (on) {
+                              _selectedZones.add(z.name);
+                            } else {
+                              _selectedZones.remove(z.name);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: controller.isSaving.value
                       ? null
-                      : () => controller.saveZones(
-                          _zonesCtrl.text
-                              .split(',')
-                              .map((e) => e.trim())
-                              .where((e) => e.isNotEmpty)
-                              .toList(),
-                        ),
+                      : () => controller.saveZones(_selectedZones.toList()),
                   child: const Text('Save Zones'),
                 ),
                 const SizedBox(height: 16),
