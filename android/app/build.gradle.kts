@@ -8,7 +8,7 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val customerApplicationId = "com.urbangoodz.customer"
+val driverApplicationId = "com.urbangoodz.driver"
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = customerApplicationId
+    namespace = driverApplicationId
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -31,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = customerApplicationId
+        applicationId = driverApplicationId
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
