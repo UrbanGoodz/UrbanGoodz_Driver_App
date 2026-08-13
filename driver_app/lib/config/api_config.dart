@@ -6,8 +6,30 @@ class ApiConfig {
   static const String driverLogin = '/api/v1/auth/delivery-man/login';
   static const String updateFcmToken = '/api/v1/delivery-man/update-fcm-token';
   static const String driverProfile = '/api/v1/delivery-man/profile';
+  static const String driverLogout = '/api/v1/delivery-man/logout';
   static const String recordLocation =
       '/api/v1/delivery-man/record-location-data';
+
+  // Marketplace orders (restaurant, grocery, retail, home-based, pharmacy).
+  // These are the canonical delivery-man endpoints the backend has always
+  // exposed; the Urban Goodz driver app previously shipped without them, so a
+  // driver could not confirm, pick up or deliver a marketplace order at all.
+  static const String marketplaceCurrentOrders =
+      '/api/v1/delivery-man/current-orders';
+  static const String marketplaceLatestOrders =
+      '/api/v1/delivery-man/latest-orders';
+  static const String marketplaceAllOrders = '/api/v1/delivery-man/all-orders';
+  static const String marketplaceOrderDetails =
+      '/api/v1/delivery-man/order-details';
+  static const String marketplaceOrder = '/api/v1/delivery-man/order';
+  static const String marketplaceAcceptOrder =
+      '/api/v1/delivery-man/accept-order';
+  static const String marketplaceUpdateOrderStatus =
+      '/api/v1/delivery-man/update-order-status';
+  static const String marketplaceSendOrderOtp =
+      '/api/v1/delivery-man/send-order-otp';
+  static const String marketplaceOrderDeliveryHistory =
+      '/api/v1/delivery-man/order-delivery-history';
 
   // Business Courier (9)
   static const String businessJobs = '$driverApiPrefix/business-jobs';
@@ -29,6 +51,7 @@ class ApiConfig {
       '$driverApiPrefix/business-jobs/$jobId/exception';
 
   // Capability (8)
+  static const String zoneList = '/api/v1/zone/list';
   static const String capabilityProfile = '$driverApiPrefix/capability-profile';
   static const String capabilitySummary = '$driverApiPrefix/capability-summary';
   static const String capabilityVehicle =
@@ -102,4 +125,33 @@ class ApiConfig {
       '$driverApiPrefix/certifications/$id/upload';
   static String certificationRenew(int id) =>
       '$driverApiPrefix/certifications/$id/renew';
+
+  // Dedicated Routes (Stage A & B)
+  static const String assignedRoutes = '$driverApiPrefix/routes';
+  static String routeDetail(int routeId) => '$driverApiPrefix/routes/$routeId';
+  static String resequenceRoute(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/sequence';
+  static String routeStarted(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/started';
+  static String routeCompleted(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/completed';
+  static String scanPickup(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/scan-pickup';
+  static String scanDropoff(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/scan-dropoff';
+  static String scanException(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/scan-exception';
+
+  // AI Assistant
+  static const String aiDriverPrefix =
+      '/api/v1/urban-goodz/cross-app/ai/driver';
+  static const String aiDailySummary = '$aiDriverPrefix/daily-summary';
+  static const String aiRouteOptimization =
+      '$aiDriverPrefix/route-optimization';
+  static const String aiVerifyPackage = '$aiDriverPrefix/verify-package';
+  static const String aiVerifyDelivery = '$aiDriverPrefix/verify-delivery';
+  static const String aiLoadRecommendations =
+      '$aiDriverPrefix/load-recommendations';
+  static const String aiEarningsComparison =
+      '$aiDriverPrefix/earnings-comparison';
 }

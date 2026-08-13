@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/business_job_controller.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
+import 'package:urban_goodz_driver/models/driver_compensation.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 import 'package:urban_goodz_driver/screens/purchase_card_screen.dart';
 
@@ -67,17 +69,20 @@ class _BusinessJobDetailScreenState extends State<BusinessJobDetailScreen> {
           _requirements(job),
           const SizedBox(height: 12),
           _rateCard(job),
-          if (job.jobType == 'order_anywhere') ...[
+          const SizedBox(height: 12),
+          _compensationCard(job),
+          if (job.showsPurchaseCard) ...[
             const SizedBox(height: 12),
             Card(
+              key: const Key('purchase_card_entry'),
               child: ListTile(
                 leading: const Icon(Icons.credit_card, color: AppTheme.primary),
                 title: const Text(
-                  'Virtual Purchase Card',
+                  'Purchase Card',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text(
-                  'Use virtual card for purchase authorization',
+                  'View card status, submit your receipt, or report a problem',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () =>
@@ -265,6 +270,113 @@ class _BusinessJobDetailScreenState extends State<BusinessJobDetailScreen> {
     ),
   );
 
+  /// Driver compensation, exactly as the backend stated it.
+  ///
+  /// The backend compensation engine is not deployed, so today this renders
+  /// the unavailable notice. It must never render a $0.00 total in that
+  /// state: a driver reading "$0.00" would reasonably conclude the job pays
+  /// nothing, which is a different and false claim.
+  Widget _compensationCard(BusinessJobModel job) {
+    final comp = job.compensation;
+
+    if (comp == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.grey),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Your compensation',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      DriverCompensation.unavailableMessage,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final total = comp.formattedTotal;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.account_balance_wallet, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                const Text(
+                  'Your compensation',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const Spacer(),
+                Text(
+                  comp.payoutLabel,
+                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Only the components the backend actually sent. An omitted
+            // component is absent here, never shown as zero.
+            for (final line in comp.lines)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(line.label, style: const TextStyle(fontSize: 13)),
+                    Text(line.formatted, style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            if (total != null) ...[
+              const Divider(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    comp.totalLabel,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    total,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _proofChip(String label, String? url) => Padding(
     padding: const EdgeInsets.only(top: 8),
     child: Row(
@@ -287,34 +399,46 @@ class _BusinessJobDetailScreenState extends State<BusinessJobDetailScreen> {
 
   Widget _actions(BusinessJobModel job) {
     final c = controller;
-    final s = job.status;
     final busy = c.actionLoading.value;
     return Column(
       children: [
-        if (c.canAccept(s))
+        if (c.canAccept(job))
           _btn('Accept Job', AppTheme.primary, busy, () => c.accept(job.jobId)),
-        if (c.canStart(s))
+        if (c.canStart(job))
           _btn(
             'Start (En Route)',
             AppTheme.primary,
             busy,
             () => c.start(job.jobId),
           ),
-        if (c.canPickup(s))
+        // Arrival check-in has no deployed endpoint yet (CONTRACT-8). It is
+        // shown disabled rather than hidden, so the step is visible in the
+        // flow without the app pretending it can record it.
+        if (!c.arrivalCheckInSupported && job.status == JobStatus.enRoute)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Arrival check-in is not available yet — go straight to '
+              'Mark Pickup when you have the package.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.orange),
+            ),
+          ),
+        if (c.canPickup(job))
           _btn(
             'Mark Pickup',
             AppTheme.primary,
             busy,
             () => _submitProof(job, true),
           ),
-        if (c.canDeliver(s))
+        if (c.canDeliver(job))
           _btn(
             'Mark Delivery',
             AppTheme.primary,
             busy,
             () => _submitProof(job, false),
           ),
-        if (c.canReportException(s))
+        if (c.canReportException(job))
           _btn(
             'Report Exception',
             Colors.orange,

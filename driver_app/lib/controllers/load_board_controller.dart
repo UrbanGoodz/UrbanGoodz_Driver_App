@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
+import 'package:urban_goodz_driver/utils/driver_notice.dart';
 import 'package:urban_goodz_driver/models/driver_job_model.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
 
 class LoadBoardController extends GetxController {
@@ -16,13 +18,18 @@ class LoadBoardController extends GetxController {
   var currentPage = 1.obs;
   var hasMore = true.obs;
 
+  /// How the last bid or accept ended. `unconfirmed` means the server took
+  /// the request but did not return the job, so the app cannot say the
+  /// driver holds it.
+  var lastOutcome = TransitionOutcome.none.obs;
+
   @override
   void onInit() {
     fetchLoads();
     super.onInit();
   }
 
-  void fetchLoads({bool refresh = false}) async {
+  Future<void> fetchLoads({bool refresh = false}) async {
     if (refresh) {
       currentPage.value = 1;
       hasMore.value = true;
@@ -95,22 +102,95 @@ class LoadBoardController extends GetxController {
     sortLoads(sortBy.value);
   }
 
-  void bidOnLoad(String id) async {
+  /// Load ids currently on the board. A driver may only bid on or accept a
+  /// load the board actually served them.
+  Set<int> get boardLoadIds =>
+      availableLoads.map((l) => int.tryParse(l.id)).whereType<int>().toSet();
+
+  DriverJobModel? _boardLoad(String id) {
+    final loadId = int.tryParse(id);
+    if (loadId == null) return null;
+    for (final l in availableLoads) {
+      if (int.tryParse(l.id) == loadId) return l;
+    }
+    return null;
+  }
+
+  /// POST /api/v1/urban-goodz/driver/load-board/{id}/bid  (verified 2026-07-25)
+  ///
+  /// [bidAmount] is now required. The previous implementation hardcoded
+  /// `0.0` and then told the driver "Your bid has been submitted for
+  /// review" — every driver silently bid zero on every load.
+  Future<void> bidOnLoad(String id, double bidAmount, {String? notes}) async {
+    final load = _boardLoad(id);
+    if (load == null) {
+      lastOutcome.value = TransitionOutcome.refused;
+      _fail('That load is no longer on the board.');
+      return;
+    }
+    if (bidAmount <= 0) {
+      lastOutcome.value = TransitionOutcome.refused;
+      _fail('Enter a bid amount greater than zero.');
+      return;
+    }
     try {
-      final loadId = int.tryParse(id);
-      if (loadId == null) return;
-      await _api.bidOnLoad(loadId, 0.0);
-      Get.snackbar(
+      await _api.bidOnLoad(int.parse(load.id), bidAmount, notes: notes);
+      lastOutcome.value = TransitionOutcome.success;
+      showNotice(
         'Bid Submitted',
-        'Your bid has been submitted for review.',
-        snackPosition: SnackPosition.BOTTOM,
+        'Your bid of \$${bidAmount.toStringAsFixed(2)} was submitted.',
       );
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to submit bid: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      lastOutcome.value = TransitionOutcome.failed;
+      _fail('Failed to submit bid: $e');
     }
   }
+
+  /// POST /api/v1/urban-goodz/driver/load-board/{id}/accept (verified
+  /// 2026-07-25). This is the app's only accept path — it takes a *load*
+  /// id, not an active-job id. Success is reported only when the server
+  /// returns the resulting job.
+  Future<void> acceptLoad(String id) async {
+    final load = _boardLoad(id);
+    if (load == null) {
+      lastOutcome.value = TransitionOutcome.refused;
+      _fail('That load is no longer on the board.');
+      return;
+    }
+    try {
+      final job = await _api.acceptLoad(int.parse(load.id));
+      if (job.isEmpty) {
+        lastOutcome.value = TransitionOutcome.unconfirmed;
+        showNotice(
+          'Not confirmed',
+          'The server accepted the request but did not return the job. '
+              'Refresh your jobs list to confirm before starting work.',
+        );
+        return;
+      }
+      availableLoads.removeWhere((l) => l.id == load.id);
+      applyFilters();
+      lastOutcome.value = TransitionOutcome.success;
+      // Deliberately does not name the list the job lands in. The driver app
+      // has two job lists (`business-jobs`, which the Active Jobs screen
+      // reads, and `active-jobs`) and the backend has not documented which
+      // one an accepted load appears in — see CONTRACT-11. Claiming "it's in
+      // your Active Jobs" would be an assertion the app cannot support.
+      final jobId = job['id']?.toString() ?? job['job_id']?.toString();
+      showNotice(
+        'Load Accepted',
+        jobId == null
+            ? 'The server confirmed the job is yours. Refresh your jobs list.'
+            : 'Job #$jobId is yours. Refresh your jobs list to start it.',
+      );
+    } catch (e) {
+      lastOutcome.value = TransitionOutcome.failed;
+      _fail('Failed to accept load: $e');
+    }
+  }
+
+  void _fail(String message) => showNotice(
+        'Action not allowed',
+        message,
+      );
 }

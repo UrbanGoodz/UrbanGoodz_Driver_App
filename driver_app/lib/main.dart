@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:urban_goodz_driver/controllers/driver_auth_controller.dart';
 import 'package:urban_goodz_driver/services/api_client.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
+import 'package:urban_goodz_driver/services/location_service.dart';
+import 'package:urban_goodz_driver/services/driver_realtime_service.dart';
+import 'package:urban_goodz_driver/controllers/active_jobs_controller.dart';
+import 'package:urban_goodz_driver/controllers/earnings_controller.dart';
+import 'package:urban_goodz_driver/controllers/load_board_controller.dart';
 import 'package:urban_goodz_driver/screens/dashboard_screen.dart';
 import 'package:urban_goodz_driver/screens/driver_onboarding_screen.dart';
 import 'package:urban_goodz_driver/screens/splash_screen.dart';
@@ -13,7 +20,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
-  } catch (_) {}
+  } catch (e, st) {
+    debugPrint('[Firebase] initializeApp FAILED: $e');
+    debugPrint('[Firebase] $st');
+  }
   runApp(const MyApp());
 }
 
@@ -26,6 +36,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final DriverAuthController _authController;
+  late final DriverRealtimeService _realtime;
+  Worker? _authRealtimeWorker;
   bool _sessionRestored = false;
 
   @override
@@ -34,14 +46,70 @@ class _MyAppState extends State<MyApp> {
     _authController = Get.put(DriverAuthController());
     Get.put(ApiClient());
     Get.put(DriverApiService());
+    Get.put(LocationService());
+    _realtime = Get.put(DriverRealtimeService());
+
+    // Any authenticated call rejected with 401 tears the session down once,
+    // here, instead of each screen swallowing the failure.
+    ApiClient.onUnauthorized = () => _authController.handleSessionExpired();
+
+    // Logout and session expiry both stop GPS reporting, so a signed-out phone
+    // never keeps publishing the driver's position.
+    _authController.onSessionEnded = () async {
+      await Get.find<LocationService>().reset();
+      await _realtime.disconnect();
+    };
+    _authRealtimeWorker = ever<bool>(_authController.isLoggedIn, (loggedIn) {
+      if (loggedIn) {
+        unawaited(_connectRealtime());
+      } else {
+        unawaited(_realtime.disconnect());
+      }
+    });
+
     _restoreSession();
   }
 
+  Future<void> _connectRealtime() => _realtime.connect(
+    driverId: _authController.driverId.value,
+    bearerToken: _authController.token.value,
+    onAssignmentUpdated: (_) {
+      if (Get.isRegistered<ActiveJobsController>()) {
+        unawaited(Get.find<ActiveJobsController>().fetchActiveJobs());
+      }
+      if (Get.isRegistered<LoadBoardController>()) {
+        unawaited(Get.find<LoadBoardController>().fetchLoads(refresh: true));
+      }
+    },
+    onPaymentUpdated: (_) {
+      if (Get.isRegistered<EarningsController>()) {
+        Get.find<EarningsController>().fetchEarnings();
+      }
+    },
+  );
+
   Future<void> _restoreSession() async {
-    await _authController.restoreSession();
+    try {
+      await _authController.restoreSession().timeout(
+        const Duration(seconds: 10),
+      );
+    } catch (_) {}
+
+    // Resume location reporting only for a session the backend accepted.
+    if (_authController.isLoggedIn.value) {
+      unawaited(Get.find<LocationService>().resumeIfAvailable());
+    }
+
     if (mounted) {
       setState(() => _sessionRestored = true);
     }
+  }
+
+  @override
+  void dispose() {
+    _authRealtimeWorker?.dispose();
+    unawaited(_realtime.disconnect());
+    super.dispose();
   }
 
   @override
@@ -52,8 +120,8 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       home: _sessionRestored
           ? (_authController.isLoggedIn.value
-              ? const DashboardScreen()
-              : const DriverOnboardingScreen())
+                ? const DashboardScreen()
+                : const DriverOnboardingScreen())
           : const SplashScreen(),
     );
   }

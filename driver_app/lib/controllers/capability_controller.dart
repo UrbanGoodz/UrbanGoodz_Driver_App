@@ -12,6 +12,11 @@ class CapabilityController extends GetxController {
 
   var profile = Rxn<CapabilityProfile>();
   var allowed = Rxn<CapabilityAllowedValues>();
+
+  /// Zones the platform serves, for the preferred-zones selector. Read live so
+  /// new zones become selectable without an app release.
+  var zoneOptions = <ZoneOption>[].obs;
+
   var isLoading = false.obs;
   var isSaving = false.obs;
   var errorMessage = ''.obs;
@@ -27,6 +32,17 @@ class CapabilityController extends GetxController {
       errorMessage.value = _msg(e);
     } finally {
       isLoading.value = false;
+    }
+    // Zones load separately: a zone-list failure must not blank the whole
+    // capability screen, it just leaves that one selector empty.
+    await loadZones();
+  }
+
+  Future<void> loadZones() async {
+    try {
+      zoneOptions.value = await _api.getServiceZones();
+    } catch (_) {
+      zoneOptions.clear();
     }
   }
 

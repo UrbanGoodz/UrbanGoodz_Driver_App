@@ -1,3 +1,6 @@
+import 'package:urban_goodz_driver/models/driver_compensation.dart';
+import 'package:urban_goodz_driver/models/job_lifecycle.dart';
+
 class BusinessJobModel {
   final int jobId;
   final String jobNumber;
@@ -17,6 +20,14 @@ class BusinessJobModel {
   final JobProof proof;
   final bool hasException;
 
+  /// Driver compensation as computed by the backend, or `null` when the
+  /// backend sent none. Null is the signal to display
+  /// [DriverCompensation.unavailableMessage] rather than a zero total.
+  ///
+  /// The compensation engine is not deployed yet, so in production this is
+  /// currently always null. That is the intended behaviour, not a defect.
+  final DriverCompensation? compensation;
+
   BusinessJobModel({
     required this.jobId,
     required this.jobNumber,
@@ -35,7 +46,21 @@ class BusinessJobModel {
     required this.exception,
     required this.proof,
     required this.hasException,
+    this.compensation,
   });
+
+  /// Whether the Order Anywhere purchase-card section belongs on this job.
+  ///
+  /// Three conditions, all required. The job must be an Order Anywhere job —
+  /// no other job type has a purchase card. It must be one the driver actually
+  /// holds, which the driver-scoped `business-jobs` endpoint guarantees by
+  /// only returning this driver's work. And it must not be cancelled or
+  /// failed: the backend refuses card actions on those with a 422, so offering
+  /// the section would only lead the driver into a dead end.
+  bool get showsPurchaseCard {
+    if (jobType != 'order_anywhere') return false;
+    return status != JobStatus.cancelled && status != JobStatus.failed;
+  }
 
   factory BusinessJobModel.fromJson(Map<String, dynamic> j) {
     return BusinessJobModel(
@@ -58,6 +83,7 @@ class BusinessJobModel {
       exception: JobException.fromJson(j['exception'] ?? {}),
       proof: JobProof.fromJson(j['proof'] ?? {}),
       hasException: j['exception']?['has_exception'] == true,
+      compensation: DriverCompensation.tryParse(j),
     );
   }
 

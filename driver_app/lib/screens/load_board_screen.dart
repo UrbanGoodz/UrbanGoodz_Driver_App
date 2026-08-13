@@ -107,7 +107,8 @@ class _LoadBoardScreenState extends State<LoadBoardScreen> {
                         final load = controller.filteredLoads[index];
                         return _LoadCard(
                           load: load,
-                          onBid: () => controller.bidOnLoad(load.id),
+                          onBid: () => _promptBid(context, load),
+                          onAccept: () => controller.acceptLoad(load.id),
                         );
                       },
                     ),
@@ -115,6 +116,75 @@ class _LoadBoardScreenState extends State<LoadBoardScreen> {
           ],
         );
       }),
+    );
+  }
+
+  /// Collects a real bid amount before calling the bid endpoint.
+  ///
+  /// The previous build sent a hardcoded `0.0` for every bid and then told
+  /// the driver the bid was "submitted for review" — so every driver bid
+  /// zero on every load without knowing it. The amount is now the driver's,
+  /// and there is no path to submitting a bid without one.
+  Future<void> _promptBid(BuildContext context, dynamic load) async {
+    final amountCtrl = TextEditingController(
+      text: load.earnings > 0 ? load.earnings.toStringAsFixed(2) : '',
+    );
+    final notesCtrl = TextEditingController();
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Place Bid'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              load.title,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountCtrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Your bid',
+                prefixText: '\$',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: notesCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Submit Bid'),
+          ),
+        ],
+      ),
+    );
+
+    if (submitted != true) return;
+    final notes = notesCtrl.text.trim();
+    await controller.bidOnLoad(
+      load.id,
+      double.tryParse(amountCtrl.text.trim()) ?? 0,
+      notes: notes.isEmpty ? null : notes,
     );
   }
 }
@@ -156,8 +226,13 @@ class _SortButton extends StatelessWidget {
 class _LoadCard extends StatelessWidget {
   final dynamic load;
   final VoidCallback onBid;
+  final VoidCallback onAccept;
 
-  const _LoadCard({required this.load, required this.onBid});
+  const _LoadCard({
+    required this.load,
+    required this.onBid,
+    required this.onAccept,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -298,16 +373,32 @@ class _LoadCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onBid,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: AppTheme.white,
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onBid,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.dark,
+                  ),
+                  child: const Text('Place Bid'),
+                ),
               ),
-              child: const Text('Place Bid'),
-            ),
+              const SizedBox(width: 8),
+              // Accept takes the load outright. It posts to the load-board
+              // accept route (verified deployed) and only reports success
+              // once the server returns the resulting job.
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onAccept,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: AppTheme.white,
+                  ),
+                  child: const Text('Accept Load'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
