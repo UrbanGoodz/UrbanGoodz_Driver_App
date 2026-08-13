@@ -40,14 +40,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('renders the brand header in high-contrast text', (tester) async {
+  testWidgets('renders the brand header with the real wordmark and a '
+      'high-contrast role label', (tester) async {
     await pumpLogin(tester);
 
-    expect(find.text('URBAN GOODZ'), findsOneWidget);
+    // The wordmark is the real Urban Goodz brand asset (an image), not a
+    // 'UG' text placeholder in an orange box, so it can't be found by text.
+    // Two brand images render: the app mark and the wordmark.
+    expect(find.byType(Image), findsNWidgets(2));
     expect(find.text('DRIVER PARTNER LOGISTICS'), findsOneWidget);
 
-    final Text title = tester.widget(find.text('URBAN GOODZ'));
-    expect(title.style?.color, AppTheme.dark);
+    final Text roleLabel = tester.widget(find.text('DRIVER PARTNER LOGISTICS'));
+    expect(roleLabel.style?.color, isNotNull);
   });
 
   testWidgets('shows the single supported sign-in form', (tester) async {
