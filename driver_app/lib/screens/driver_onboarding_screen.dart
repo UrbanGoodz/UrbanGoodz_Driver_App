@@ -146,6 +146,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       }
 
       try {
+        // Android 13+ requires this to be requested at runtime - without it
+        // the OS silently withholds POST_NOTIFICATIONS forever (no prompt,
+        // no notifications), regardless of the token registered below.
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
         final fcmToken = await FirebaseMessaging.instance.getToken();
         if (fcmToken != null && fcmToken.isNotEmpty) {
           await service.updateFcmToken(fcmToken);
