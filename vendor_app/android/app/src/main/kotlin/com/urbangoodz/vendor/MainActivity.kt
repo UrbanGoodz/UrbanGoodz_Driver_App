@@ -1,4 +1,4 @@
-package com.urbangoodz.urban_goodz_vendor
+package com.urbangoodz.vendor
 
 import io.flutter.embedding.android.FlutterActivity
 
