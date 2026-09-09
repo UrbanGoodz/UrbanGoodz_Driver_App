@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
+import 'package:urban_goodz_driver/screens/barcode_scan_screen.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 
 class DedicatedRouteManifestScreen extends StatefulWidget {
@@ -26,7 +27,13 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
         title: const Text('Route Manifest'),
         actions: [
           IconButton(
+            tooltip: 'Scan package',
             icon: const Icon(Icons.qr_code_scanner),
+            onPressed: _openScanner,
+          ),
+          IconButton(
+            tooltip: 'Enter barcode manually',
+            icon: const Icon(Icons.keyboard),
             onPressed: () {
               setState(() => _showScanInput = !_showScanInput);
             },
@@ -85,7 +92,8 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
                 ),
               ),
 
-            // Scan Input simulation bar
+            // Manual barcode entry, the fallback when the camera is
+            // unavailable or the label is unreadable.
             if (_showScanInput)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -96,7 +104,7 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
                       child: TextField(
                         controller: _scanController,
                         decoration: const InputDecoration(
-                          hintText: 'Enter barcode to simulate scan...',
+                          hintText: 'Enter barcode manually...',
                           border: OutlineInputBorder(),
                           contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           fillColor: Colors.white,
@@ -165,6 +173,21 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
         );
       }),
     );
+  }
+
+  /// Opens the camera scanner and feeds whatever it decodes into the exact
+  /// same handler manual entry uses. Returning null means the driver backed
+  /// out or chose manual entry, so the manual field is revealed instead.
+  Future<void> _openScanner() async {
+    final barcode = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScanScreen()),
+    );
+    if (!mounted) return;
+    if (barcode == null || barcode.isEmpty) {
+      setState(() => _showScanInput = true);
+      return;
+    }
+    _handlePackageScan(barcode);
   }
 
   void _handlePackageScan(String barcode) {

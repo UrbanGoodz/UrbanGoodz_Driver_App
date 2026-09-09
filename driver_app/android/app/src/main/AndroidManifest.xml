@@ -43,6 +43,13 @@
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <!-- Required by mobile_scanner for package barcode scanning on the route
+         manifest. Without it the scanner surface starts and immediately fails
+         with permissionDenied. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+
     <queries>
         <!-- Android 11+ package visibility. Without these, url_launcher's
              launchUrl silently fails for tel:, sms: and https:, which is how
