@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/route_details_controller.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
@@ -397,11 +398,11 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.phone, color: AppTheme.primary),
-                      onPressed: () {},
+                      onPressed: () => _contactCustomer('tel', job.customerPhone),
                     ),
                     IconButton(
                       icon: const Icon(Icons.message, color: AppTheme.primary),
-                      onPressed: () {},
+                      onPressed: () => _contactCustomer('sms', job.customerPhone),
                     ),
                   ],
                 ),
@@ -437,6 +438,28 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
       }),
     );
   }
+
+  /// Dials or texts the customer. [scheme] is 'tel' or 'sms'. A device without
+  /// a phone/SMS handler (a tablet, an emulator) reports back instead of the
+  /// button appearing to do nothing, which is what it did before.
+  Future<void> _contactCustomer(String scheme, String phone) async {
+    final digits = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digits.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No phone number on file for this customer.')),
+      );
+      return;
+    }
+    final uri = Uri(scheme: scheme, path: digits);
+    if (!await launchUrl(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open ${scheme == 'tel' ? 'the dialer' : 'messages'}.')),
+      );
+    }
+  }
+
 }
 
 class _ProgressStep extends StatelessWidget {

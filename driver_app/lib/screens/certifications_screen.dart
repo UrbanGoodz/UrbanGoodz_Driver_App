@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/certifications_controller.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
@@ -221,7 +222,7 @@ class _CertificationsScreenState extends State<CertificationsScreen> {
                           if (cert.status == 'valid' &&
                               cert.documentUrl.isNotEmpty)
                             TextButton.icon(
-                              onPressed: () {},
+                              onPressed: () => _openDocument(cert.documentUrl),
                               icon: const Icon(Icons.file_present, size: 16),
                               label: const Text(
                                 'View',
@@ -297,6 +298,20 @@ class _CertificationsScreenState extends State<CertificationsScreen> {
       }),
     );
   }
+
+  /// Opens a certification document in the device's browser/viewer. The button
+  /// only renders when documentUrl is non-empty, but a malformed URL from the
+  /// API would still fail here, so the failure is surfaced rather than silent.
+  Future<void> _openDocument(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this document.')),
+      );
+    }
+  }
+
 }
 
 class _StatBadge extends StatelessWidget {
