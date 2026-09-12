@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
+import 'package:urban_goodz_driver/screens/barcode_scanner_screen.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 
 class DedicatedRouteManifestScreen extends StatefulWidget {
@@ -25,8 +26,17 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
       appBar: AppBar(
         title: const Text('Route Manifest'),
         actions: [
+          // Opens the camera. This used to toggle a text field labelled
+          // "simulate scan" - the icon promised a scanner the app did not have.
           IconButton(
+            tooltip: 'Scan package',
             icon: const Icon(Icons.qr_code_scanner),
+            onPressed: _openScanner,
+          ),
+          // Manual entry stays reachable for labels the camera cannot read.
+          IconButton(
+            tooltip: 'Enter barcode by hand',
+            icon: const Icon(Icons.keyboard),
             onPressed: () {
               setState(() => _showScanInput = !_showScanInput);
             },
@@ -85,7 +95,8 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
                 ),
               ),
 
-            // Scan Input simulation bar
+            // Manual barcode entry - the fallback for a label the camera
+            // cannot read. The camera itself is the scanner icon above.
             if (_showScanInput)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -96,7 +107,7 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
                       child: TextField(
                         controller: _scanController,
                         decoration: const InputDecoration(
-                          hintText: 'Enter barcode to simulate scan...',
+                          hintText: 'Type the barcode from the label...',
                           border: OutlineInputBorder(),
                           contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           fillColor: Colors.white,
@@ -165,6 +176,21 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
         );
       }),
     );
+  }
+
+  /// Opens the camera scanner and feeds whatever it decodes into the same
+  /// path a typed barcode takes, so matching, offline queueing and the scan
+  /// endpoints are unchanged.
+  Future<void> _openScanner() async {
+    final barcode = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+
+    // The driver backing out of the camera is not an error.
+    if (barcode == null || barcode.trim().isEmpty) return;
+    if (!mounted) return;
+
+    _handlePackageScan(barcode.trim());
   }
 
   void _handlePackageScan(String barcode) {

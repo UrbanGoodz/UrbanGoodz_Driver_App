@@ -1,5 +1,23 @@
 class ApiConfig {
-  static const String baseUrl = 'https://admin.urbangoodzdelivery.com';
+  /// API host.
+  ///
+  /// Defaults to production, so an ordinary `flutter build` is unchanged and a
+  /// shipped app can never accidentally point somewhere else. Override it only
+  /// at build time for testing against a local or staging backend:
+  ///
+  ///   flutter build apk --dart-define=UG_API_BASE_URL=http://localhost:8000
+  ///
+  /// A local host is reachable from a USB device via
+  /// `adb reverse tcp:8000 tcp:8000`, which maps the phone's own localhost to
+  /// the development machine.
+  ///
+  /// This exists because the value used to be a hardcoded const, which meant
+  /// no build of this app could ever be exercised against anything but the
+  /// live production database.
+  static const String baseUrl = String.fromEnvironment(
+    'UG_API_BASE_URL',
+    defaultValue: 'https://admin.urbangoodzdelivery.com',
+  );
   static const String driverApiPrefix = '/api/v1/urban-goodz/driver';
 
   // Auth (legacy delivery-man routes)

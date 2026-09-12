@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is permitted ONLY for loopback addresses, so a USB-attached
+  device can reach a development backend through `adb reverse tcp:8000 tcp:8000`.
+
+  Everything else keeps the platform default, which since Android 9 refuses
+  cleartext outright. In particular the production host is not listed here and
+  therefore cannot be talked to over plain HTTP, so this cannot weaken a real
+  install - it only unblocks testing against a local machine.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- The Android emulator's alias for the host machine. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
