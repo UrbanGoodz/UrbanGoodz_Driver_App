@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/earnings_controller.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
+import 'package:urban_goodz_driver/utils/json_number.dart';
 
 class EarningsScreen extends StatefulWidget {
   const EarningsScreen({super.key});
@@ -289,15 +290,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '\$${((e['amount'] as num?) ?? 0).toDouble().toStringAsFixed(2)}',
+                                '\$${jsonDouble(e['amount']).toStringAsFixed(2)}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
                                 ),
                               ),
-                              if (((e['tips'] as num?) ?? 0) > 0)
+                              if (jsonDouble(e['tips']) > 0)
                                 Text(
-                                  '+\$${((e['tips'] as num?) ?? 0).toDouble().toStringAsFixed(2)} tip',
+                                  '+\$${jsonDouble(e['tips']).toStringAsFixed(2)} tip',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: AppTheme.primary,

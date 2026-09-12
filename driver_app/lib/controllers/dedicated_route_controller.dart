@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
+import 'package:urban_goodz_driver/utils/json_number.dart';
 
 class DedicatedRouteController extends GetxController {
   final DriverApiService _api = Get.find<DriverApiService>();
@@ -83,7 +84,11 @@ class DedicatedRouteController extends GetxController {
     for (var action in pendingActions) {
       final type = action['type'];
       final data = action['data'] as Map<String, dynamic>;
-      final routeId = data['route_id'] as int;
+      // Queued offline actions are round-tripped through JSON in shared
+      // preferences, so route_id can come back as a string. A throw here
+      // would abort the whole sync loop and strand every queued scan, not
+      // just this one.
+      final routeId = jsonInt(data['route_id']);
 
       try {
         if (type == 'pickup') {

@@ -1,3 +1,4 @@
+import 'package:urban_goodz_driver/utils/json_number.dart';
 class VehicleModel {
   final String id;
   final String type;
@@ -43,7 +44,7 @@ class VehicleModel {
       type: json['type'] as String,
       make: json['make'] as String,
       model: json['model'] as String,
-      year: json['year'] as int,
+      year: jsonInt(json['year']),
       color: json['color'] as String,
       licensePlate: json['license_plate'] as String,
       insuranceProvider: json['insurance_provider'] as String,
@@ -52,7 +53,7 @@ class VehicleModel {
       isAvailable: json['is_available'] as bool? ?? true,
       isInsured: json['is_insured'] as bool? ?? true,
       isRegistered: json['is_registered'] as bool? ?? true,
-      mileage: (json['mileage'] as num?)?.toDouble() ?? 0.0,
+      mileage: jsonDouble(json['mileage']),
       lastMaintenance: json['last_maintenance'] as String? ?? '',
       nextMaintenance: json['next_maintenance'] as String? ?? '',
       certifications:

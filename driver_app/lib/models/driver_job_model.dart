@@ -1,3 +1,4 @@
+import 'package:urban_goodz_driver/utils/json_number.dart';
 class DriverJobModel {
   final String id;
   final String type;
@@ -61,13 +62,13 @@ class DriverJobModel {
       description: json['description'] as String,
       pickupAddress: json['pickup_address'] as String,
       dropoffAddress: json['dropoff_address'] as String,
-      pickupLatitude: (json['pickup_latitude'] as num?)?.toDouble(),
-      pickupLongitude: (json['pickup_longitude'] as num?)?.toDouble(),
-      dropoffLatitude: (json['dropoff_latitude'] as num?)?.toDouble(),
-      dropoffLongitude: (json['dropoff_longitude'] as num?)?.toDouble(),
+      pickupLatitude: jsonDoubleOrNull(json['pickup_latitude']),
+      pickupLongitude: jsonDoubleOrNull(json['pickup_longitude']),
+      dropoffLatitude: jsonDoubleOrNull(json['dropoff_latitude']),
+      dropoffLongitude: jsonDoubleOrNull(json['dropoff_longitude']),
       status: json['status'] as String,
-      earnings: (json['earnings'] as num).toDouble(),
-      distance: (json['distance'] as num).toDouble(),
+      earnings: jsonDouble(json['earnings']),
+      distance: jsonDouble(json['distance']),
       estimatedDuration: json['estimated_duration'] as String,
       customerName: json['customer_name'] as String,
       customerPhone: json['customer_phone'] as String,
