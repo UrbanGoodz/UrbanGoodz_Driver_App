@@ -91,6 +91,22 @@ class DedicatedRouteModel {
       'vehicle_type_required': vehicleTypeRequired,
     };
   }
+
+  // Lifecycle gates. The server's UrbanGoodzDedicatedRoute::STATUSES is the
+  // source of truth, and it contains neither 'planned' nor 'started' - gating
+  // a control on those hides it for every real route.
+  static const Set<String> _preStart = {'approved', 'active', 'pickup_pending'};
+  static const Set<String> _terminal = {
+    'completed',
+    'partially_completed',
+    'canceled',
+    'cancelled',
+    'draft',
+  };
+
+  bool get canStart => _preStart.contains(status);
+  bool get canComplete => status == 'in_progress';
+  bool get canResequence => !_terminal.contains(status);
 }
 
 class RoutePackageModel {

@@ -112,7 +112,7 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                     const SizedBox(height: 20),
 
                     // Resequencing preferences
-                    if (route.status == 'planned' || route.status == 'started' || route.status == 'admin_review') ...[
+                    if (route.canResequence) ...[
                       const Text(
                         'Resequence Stop Order',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -196,7 +196,7 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                     const SizedBox(height: 12),
 
                     // Start/Complete Route Action button
-                    if (route.status == 'planned')
+                    if (route.canStart)
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -210,7 +210,7 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                           onPressed: () => controller.startActiveRoute(route.id),
                         ),
                       )
-                    else if (route.status == 'started')
+                    else if (route.canComplete)
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
