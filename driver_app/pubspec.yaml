@@ -42,7 +42,7 @@ dependencies:
   # Real barcode/QR decoding from the camera. Before this the manifest screen
   # only had a text field labelled "simulate scan", so drivers had to read the
   # label and type it by hand.
-  mobile_scanner: ^7.4.0
+  mobile_scanner: 7.0.1
   webview_flutter: ^4.14.1
   image_picker: ^1.2.3
 dev_dependencies:
