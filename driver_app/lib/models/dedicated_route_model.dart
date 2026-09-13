@@ -31,19 +31,42 @@ class DedicatedRouteModel {
     required this.vehicleTypeRequired,
   });
 
+  /// Parses a number that the API may send as either a JSON number or a
+  /// string.
+  ///
+  /// MySQL DECIMAL columns are serialised by PHP as strings - `pickup_lat`
+  /// arrives as `"29.7604000"` and `driver_pay_per_package` as `"0.00"`, not
+  /// as numbers. A bare `as num?` cast therefore throws
+  /// "type 'String' is not a subtype of type 'num?' in type cast", which took
+  /// down the entire Assigned Dedicated Routes screen for any driver who
+  /// actually had a route. The screen only looked healthy because no route
+  /// was ever assigned in testing.
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  /// Same problem for counts, which can arrive as "6" rather than 6.
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
   factory DedicatedRouteModel.fromJson(Map<String, dynamic> json) {
     return DedicatedRouteModel(
-      id: json['id'] ?? 0,
+      id: _toInt(json['id']),
       routeName: json['route_name'] ?? '',
       routeType: json['route_type'] ?? '',
       pickupLocation: json['pickup_location'] ?? '',
-      pickupLat: (json['pickup_lat'] as num?)?.toDouble() ?? 0.0,
-      pickupLng: (json['pickup_lng'] as num?)?.toDouble() ?? 0.0,
+      pickupLat: _toDouble(json['pickup_lat']),
+      pickupLng: _toDouble(json['pickup_lng']),
       status: json['status'] ?? 'planned',
-      totalPackages: json['total_packages'] ?? 0,
-      completedPackages: json['completed_packages'] ?? 0,
-      failedPackages: json['failed_packages'] ?? 0,
-      driverPayPerPackage: (json['driver_pay_per_package'] as num?)?.toDouble() ?? 0.0,
+      totalPackages: _toInt(json['total_packages']),
+      completedPackages: _toInt(json['completed_packages']),
+      failedPackages: _toInt(json['failed_packages']),
+      driverPayPerPackage: _toDouble(json['driver_pay_per_package']),
       instantPayoutAllowed: json['instant_payout_allowed'] == 1 || json['instant_payout_allowed'] == true,
       weeklyPayoutAllowed: json['weekly_payout_allowed'] == 1 || json['weekly_payout_allowed'] == true,
       vehicleTypeRequired: json['vehicle_type_required'] ?? '',
@@ -68,6 +91,22 @@ class DedicatedRouteModel {
       'vehicle_type_required': vehicleTypeRequired,
     };
   }
+
+  // Lifecycle gates. The server's UrbanGoodzDedicatedRoute::STATUSES is the
+  // source of truth, and it contains neither 'planned' nor 'started' - gating
+  // a control on those hides it for every real route.
+  static const Set<String> _preStart = {'approved', 'active', 'pickup_pending'};
+  static const Set<String> _terminal = {
+    'completed',
+    'partially_completed',
+    'canceled',
+    'cancelled',
+    'draft',
+  };
+
+  bool get canStart => _preStart.contains(status);
+  bool get canComplete => status == 'in_progress';
+  bool get canResequence => !_terminal.contains(status);
 }
 
 class RoutePackageModel {
@@ -111,13 +150,14 @@ class RoutePackageModel {
 
   factory RoutePackageModel.fromJson(Map<String, dynamic> json) {
     return RoutePackageModel(
-      id: json['package_id'] ?? json['id'] ?? 0,
+      id: DedicatedRouteModel._toInt(json['package_id'] ?? json['id']),
       trackingId: json['tracking_id'] ?? '',
       barcode: json['barcode'] ?? '',
       dropoffName: json['dropoff_name'] ?? '',
       dropoffAddress: json['dropoff_address'] ?? '',
-      dropoffLat: (json['dropoff_lat'] as num?)?.toDouble() ?? 0.0,
-      dropoffLng: (json['dropoff_lng'] as num?)?.toDouble() ?? 0.0,
+      // Same string-vs-number problem as the route coordinates above.
+      dropoffLat: DedicatedRouteModel._toDouble(json['dropoff_lat']),
+      dropoffLng: DedicatedRouteModel._toDouble(json['dropoff_lng']),
       deliveryWindowStart: json['delivery_window_start'],
       deliveryWindowEnd: json['delivery_window_end'],
       status: json['status'] ?? 'pending',
@@ -127,7 +167,7 @@ class RoutePackageModel {
       noContactlessDelivery: json['no_contactless_delivery'] == 1 || json['no_contactless_delivery'] == true,
       deliveryCompletionLockedUntilVerified: json['delivery_completion_locked_until_verified'] == 1 || json['delivery_completion_locked_until_verified'] == true,
       ageVerificationStatus: json['age_verification_status'],
-      stopOrder: json['stop_order'] ?? 1,
+      stopOrder: json['stop_order'] == null ? 1 : DedicatedRouteModel._toInt(json['stop_order']),
     );
   }
 

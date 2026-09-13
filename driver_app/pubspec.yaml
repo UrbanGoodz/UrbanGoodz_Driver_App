@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 3.9.2+8
+version: 3.9.3+9
 
 environment:
   sdk: ^3.12.0
@@ -39,9 +39,12 @@ dependencies:
   http: ^1.6.0
   geolocator: ^14.0.2
   dart_pusher_channels: ^1.3.1
+  # Real barcode/QR decoding from the camera. Before this the manifest screen
+  # only had a text field labelled "simulate scan", so drivers had to read the
+  # label and type it by hand.
+  mobile_scanner: ^7.4.0
   webview_flutter: ^4.14.1
   image_picker: ^1.2.3
-  mobile_scanner: ^7.4.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

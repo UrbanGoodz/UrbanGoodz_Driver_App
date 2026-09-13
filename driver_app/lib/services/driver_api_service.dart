@@ -739,17 +739,50 @@ class DriverApiService extends GetxService {
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
+  /// Choose where the run ends.
+  ///
+  /// [mode] is 'hub' (back to pickup), 'open' (wherever the last stop falls)
+  /// or 'address'. In address mode send either [endAddress] for the server to
+  /// look up, or an exact [endLat]/[endLng] picked on a map.
+  Future<Map<String, dynamic>> setRouteFinish(
+    int routeId, {
+    required String mode,
+    String? endAddress,
+    double? endLat,
+    double? endLng,
+    String? endLabel,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.routeFinish(routeId), {
+        'mode': mode,
+        'end_address': ?endAddress,
+        'end_lat': ?endLat,
+        'end_lng': ?endLng,
+        'end_label': ?endLabel,
+      }),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
   Future<Map<String, dynamic>> scanPickup(
     int routeId, {
     required String barcode,
     required double lat,
     required double lng,
+    String inputMethod = 'manual',
   }) async {
     final body = await _ok(
       await _client.authPost(ApiConfig.scanPickup(routeId), {
         'barcode': barcode,
+        // The server validates latitude/longitude. It ignored lat/lng, and
+        // because both are nullable the coordinates were dropped silently.
+        // Both spellings go out so the app stays correct against a server
+        // deployed before or after this fix.
+        'latitude': lat,
+        'longitude': lng,
         'lat': lat,
         'lng': lng,
+        'input_method': inputMethod,
       }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
@@ -766,6 +799,8 @@ class DriverApiService extends GetxService {
     final body = await _ok(
       await _client.authPost(ApiConfig.scanDropoff(routeId), {
         'barcode': barcode,
+        'latitude': lat,
+        'longitude': lng,
         'lat': lat,
         'lng': lng,
         'proof_photo': ?proofPhoto,

@@ -26,6 +26,8 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
       appBar: AppBar(
         title: const Text('Route Manifest'),
         actions: [
+          // Opens the camera. This used to toggle a text field labelled
+          // "simulate scan" - the icon promised a scanner the app did not have.
           IconButton(
             tooltip: 'Scan package',
             icon: const Icon(Icons.qr_code_scanner),
@@ -118,7 +120,7 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
                       onPressed: () {
                         final barcode = _scanController.text.trim();
                         if (barcode.isNotEmpty) {
-                          _handlePackageScan(barcode);
+                          _handlePackageScan(barcode, inputMethod: 'manual');
                           _scanController.clear();
                           setState(() => _showScanInput = false);
                         }
@@ -183,14 +185,16 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
       MaterialPageRoute(builder: (_) => const BarcodeScanScreen()),
     );
     if (!mounted) return;
-    if (barcode == null || barcode.isEmpty) {
+    if (barcode == null || barcode.trim().isEmpty) {
       setState(() => _showScanInput = true);
       return;
     }
-    _handlePackageScan(barcode);
+    // 'barcode' is the provenance the server stores as input_method; without
+    // it every camera read is recorded as hand-typed.
+    _handlePackageScan(barcode.trim(), inputMethod: 'barcode');
   }
 
-  void _handlePackageScan(String barcode) {
+  void _handlePackageScan(String barcode, {required String inputMethod}) {
     // 1. Check if the scanned barcode belongs to any package in the manifest
     RoutePackageModel? matchingPkg;
     for (var stop in controller.stops) {
@@ -214,9 +218,20 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
     }
 
     // 2. Determine action based on current package status
+    // A package can match on trackingId while its barcode is null, which used
+    // to post an empty barcode to the server. Send whichever identifier the row
+    // actually has - the endpoint accepts either.
+    final identifier = matchingPkg.barcode.trim().isNotEmpty
+        ? matchingPkg.barcode
+        : matchingPkg.trackingId;
+
     if (matchingPkg.status == 'pending') {
       // Perform loading scan (intake scan)
-      controller.recordLoadingScan(controller.currentRoute.value!.id, matchingPkg.barcode);
+      controller.recordLoadingScan(
+        controller.currentRoute.value!.id,
+        identifier,
+        inputMethod: inputMethod,
+      );
       Get.snackbar(
         'Intake Loaded',
         'Package ${matchingPkg.trackingId} marked as Loaded.',
@@ -226,8 +241,8 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
     } else {
       // Highlight/Scroll/Show info or filter by this query
       setState(() {
-        _searchController.text = matchingPkg!.barcode;
-        _searchQuery = matchingPkg.barcode;
+        _searchController.text = identifier;
+        _searchQuery = identifier;
       });
       Get.snackbar(
         'Package Found',

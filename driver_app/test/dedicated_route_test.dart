@@ -15,6 +15,7 @@ class FakeDriverApiService extends DriverApiService {
   bool startRouteCalled = false;
   bool completeRouteCalled = false;
   bool scanPickupCalled = false;
+  String? scanPickupInputMethod;
   bool scanDropoffCalled = false;
   bool scanExceptionCalled = false;
 
@@ -118,8 +119,9 @@ class FakeDriverApiService extends DriverApiService {
   }
 
   @override
-  Future<Map<String, dynamic>> scanPickup(int routeId, {required String barcode, required double lat, required double lng}) async {
+  Future<Map<String, dynamic>> scanPickup(int routeId, {required String barcode, required double lat, required double lng, String inputMethod = 'manual'}) async {
     scanPickupCalled = true;
+    scanPickupInputMethod = inputMethod;
     return {'status': 'picked_up'};
   }
 

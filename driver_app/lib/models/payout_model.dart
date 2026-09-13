@@ -1,3 +1,4 @@
+import 'package:urban_goodz_driver/utils/json_number.dart';
 class PayoutModel {
   final String id;
   final double amount;
@@ -22,7 +23,7 @@ class PayoutModel {
   factory PayoutModel.fromJson(Map<String, dynamic> json) {
     return PayoutModel(
       id: json['id'] as String,
-      amount: (json['amount'] as num).toDouble(),
+      amount: jsonDouble(json['amount']),
       status: json['status'] as String,
       requestedDate: json['requested_date'] as String,
       completedDate: json['completed_date'] as String? ?? '',

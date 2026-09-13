@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
+import 'package:urban_goodz_driver/utils/json_number.dart';
 
 class DedicatedRouteController extends GetxController {
   final DriverApiService _api = Get.find<DriverApiService>();
@@ -83,7 +84,11 @@ class DedicatedRouteController extends GetxController {
     for (var action in pendingActions) {
       final type = action['type'];
       final data = action['data'] as Map<String, dynamic>;
-      final routeId = data['route_id'] as int;
+      // Queued offline actions are round-tripped through JSON in shared
+      // preferences, so route_id can come back as a string. A throw here
+      // would abort the whole sync loop and strand every queued scan, not
+      // just this one.
+      final routeId = jsonInt(data['route_id']);
 
       try {
         if (type == 'pickup') {
@@ -261,6 +266,58 @@ class DedicatedRouteController extends GetxController {
     }
   }
 
+  /// Set where the run ends and re-sort the stops behind it.
+  ///
+  /// Returns the finish label the server actually resolved, so the caller can
+  /// show the driver what their typing matched - "Downing Street, Houston"
+  /// for "10 Downing Street, London" is a correct bounded match, but only if
+  /// the driver gets to see it.
+  Future<String?> setRouteFinish(
+    int routeId, {
+    required String mode,
+    String? endAddress,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      final res = await _api.setRouteFinish(
+        routeId,
+        mode: mode,
+        endAddress: endAddress,
+      );
+      await fetchRouteDetail(routeId);
+
+      final label = (res['route'] is Map) ? res['route']['finish_label'] as String? : null;
+
+      _showSnackbar(
+        'Finish Set',
+        switch (mode) {
+          'hub' => 'Stops re-sorted to end back at the pickup hub.',
+          'open' => 'Stops re-sorted with no fixed finish.',
+          _ => label == null
+              ? 'Stops re-sorted to end at your chosen address.'
+              : 'Ending at $label',
+        },
+        duration: const Duration(seconds: 5),
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      return label;
+    } catch (e) {
+      errorMessage.value = e.toString();
+      _showSnackbar(
+        'Could Not Set Finish',
+        e.toString(),
+        duration: const Duration(seconds: 5),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> startActiveRoute(int routeId) async {
     if (isOffline.value) {
       await queueOfflineAction('start', {'route_id': routeId});
@@ -309,7 +366,7 @@ class DedicatedRouteController extends GetxController {
 
   // ---------- Stop Actions ----------
 
-  Future<void> recordLoadingScan(int routeId, String barcode) async {
+  Future<void> recordLoadingScan(int routeId, String barcode, {String inputMethod = 'manual'}) async {
     final lat = currentRoute.value?.pickupLat ?? 0.0;
     final lng = currentRoute.value?.pickupLng ?? 0.0;
 
@@ -321,12 +378,13 @@ class DedicatedRouteController extends GetxController {
         'barcode': barcode,
         'lat': lat,
         'lng': lng,
+        'input_method': inputMethod,
       });
       return;
     }
 
     try {
-      await _api.scanPickup(routeId, barcode: barcode, lat: lat, lng: lng);
+      await _api.scanPickup(routeId, barcode: barcode, lat: lat, lng: lng, inputMethod: inputMethod);
       await fetchRouteDetail(routeId);
     } catch (e) {
       await queueOfflineAction('pickup', {

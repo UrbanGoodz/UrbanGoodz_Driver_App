@@ -1,3 +1,4 @@
+import 'package:urban_goodz_driver/utils/json_number.dart';
 class OpportunityModel {
   final String id;
   final String title;
@@ -29,7 +30,7 @@ class OpportunityModel {
       title: json['title'] as String,
       description: json['description'] as String,
       type: json['type'] as String,
-      reward: (json['reward'] as num).toDouble(),
+      reward: jsonDouble(json['reward']),
       status: json['status'] as String,
       validFrom: json['valid_from'] as String,
       validUntil: json['valid_until'] as String,
