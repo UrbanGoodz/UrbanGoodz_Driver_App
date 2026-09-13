@@ -314,7 +314,7 @@ class DedicatedRouteController extends GetxController {
 
   // ---------- Stop Actions ----------
 
-  Future<void> recordLoadingScan(int routeId, String barcode) async {
+  Future<void> recordLoadingScan(int routeId, String barcode, {String inputMethod = 'manual'}) async {
     final lat = currentRoute.value?.pickupLat ?? 0.0;
     final lng = currentRoute.value?.pickupLng ?? 0.0;
 
@@ -326,12 +326,13 @@ class DedicatedRouteController extends GetxController {
         'barcode': barcode,
         'lat': lat,
         'lng': lng,
+        'input_method': inputMethod,
       });
       return;
     }
 
     try {
-      await _api.scanPickup(routeId, barcode: barcode, lat: lat, lng: lng);
+      await _api.scanPickup(routeId, barcode: barcode, lat: lat, lng: lng, inputMethod: inputMethod);
       await fetchRouteDetail(routeId);
     } catch (e) {
       await queueOfflineAction('pickup', {

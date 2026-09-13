@@ -744,12 +744,20 @@ class DriverApiService extends GetxService {
     required String barcode,
     required double lat,
     required double lng,
+    String inputMethod = 'manual',
   }) async {
     final body = await _ok(
       await _client.authPost(ApiConfig.scanPickup(routeId), {
         'barcode': barcode,
+        // The server validates latitude/longitude. It ignored lat/lng, and
+        // because both are nullable the coordinates were dropped silently.
+        // Both spellings go out so the app stays correct against a server
+        // deployed before or after this fix.
+        'latitude': lat,
+        'longitude': lng,
         'lat': lat,
         'lng': lng,
+        'input_method': inputMethod,
       }),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
@@ -766,6 +774,8 @@ class DriverApiService extends GetxService {
     final body = await _ok(
       await _client.authPost(ApiConfig.scanDropoff(routeId), {
         'barcode': barcode,
+        'latitude': lat,
+        'longitude': lng,
         'lat': lat,
         'lng': lng,
         'proof_photo': ?proofPhoto,

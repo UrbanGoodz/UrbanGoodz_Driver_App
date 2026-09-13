@@ -121,7 +121,7 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
                       onPressed: () {
                         final barcode = _scanController.text.trim();
                         if (barcode.isNotEmpty) {
-                          _handlePackageScan(barcode);
+                          _handlePackageScan(barcode, inputMethod: 'manual');
                           _scanController.clear();
                           setState(() => _showScanInput = false);
                         }
@@ -190,10 +190,10 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
     if (barcode == null || barcode.trim().isEmpty) return;
     if (!mounted) return;
 
-    _handlePackageScan(barcode.trim());
+    _handlePackageScan(barcode.trim(), inputMethod: 'barcode');
   }
 
-  void _handlePackageScan(String barcode) {
+  void _handlePackageScan(String barcode, {required String inputMethod}) {
     // 1. Check if the scanned barcode belongs to any package in the manifest
     RoutePackageModel? matchingPkg;
     for (var stop in controller.stops) {
@@ -217,9 +217,20 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
     }
 
     // 2. Determine action based on current package status
+    // A package can match on trackingId while its barcode is null, which used
+    // to post an empty barcode to the server. Send whichever identifier the row
+    // actually has - the endpoint accepts either.
+    final identifier = matchingPkg.barcode.trim().isNotEmpty
+        ? matchingPkg.barcode
+        : matchingPkg.trackingId;
+
     if (matchingPkg.status == 'pending') {
       // Perform loading scan (intake scan)
-      controller.recordLoadingScan(controller.currentRoute.value!.id, matchingPkg.barcode);
+      controller.recordLoadingScan(
+        controller.currentRoute.value!.id,
+        identifier,
+        inputMethod: inputMethod,
+      );
       Get.snackbar(
         'Intake Loaded',
         'Package ${matchingPkg.trackingId} marked as Loaded.',
@@ -229,8 +240,8 @@ class _DedicatedRouteManifestScreenState extends State<DedicatedRouteManifestScr
     } else {
       // Highlight/Scroll/Show info or filter by this query
       setState(() {
-        _searchController.text = matchingPkg!.barcode;
-        _searchQuery = matchingPkg.barcode;
+        _searchController.text = identifier;
+        _searchQuery = identifier;
       });
       Get.snackbar(
         'Package Found',
