@@ -266,6 +266,58 @@ class DedicatedRouteController extends GetxController {
     }
   }
 
+  /// Set where the run ends and re-sort the stops behind it.
+  ///
+  /// Returns the finish label the server actually resolved, so the caller can
+  /// show the driver what their typing matched - "Downing Street, Houston"
+  /// for "10 Downing Street, London" is a correct bounded match, but only if
+  /// the driver gets to see it.
+  Future<String?> setRouteFinish(
+    int routeId, {
+    required String mode,
+    String? endAddress,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      final res = await _api.setRouteFinish(
+        routeId,
+        mode: mode,
+        endAddress: endAddress,
+      );
+      await fetchRouteDetail(routeId);
+
+      final label = (res['route'] is Map) ? res['route']['finish_label'] as String? : null;
+
+      _showSnackbar(
+        'Finish Set',
+        switch (mode) {
+          'hub' => 'Stops re-sorted to end back at the pickup hub.',
+          'open' => 'Stops re-sorted with no fixed finish.',
+          _ => label == null
+              ? 'Stops re-sorted to end at your chosen address.'
+              : 'Ending at $label',
+        },
+        duration: const Duration(seconds: 5),
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      return label;
+    } catch (e) {
+      errorMessage.value = e.toString();
+      _showSnackbar(
+        'Could Not Set Finish',
+        e.toString(),
+        duration: const Duration(seconds: 5),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> startActiveRoute(int routeId) async {
     if (isOffline.value) {
       await queueOfflineAction('start', {'route_id': routeId});

@@ -149,6 +149,8 @@ class ApiConfig {
   static String routeDetail(int routeId) => '$driverApiPrefix/routes/$routeId';
   static String resequenceRoute(int routeId) =>
       '$driverApiPrefix/routes/$routeId/sequence';
+  static String routeFinish(int routeId) =>
+      '$driverApiPrefix/routes/$routeId/finish';
   static String routeStarted(int routeId) =>
       '$driverApiPrefix/routes/$routeId/started';
   static String routeCompleted(int routeId) =>

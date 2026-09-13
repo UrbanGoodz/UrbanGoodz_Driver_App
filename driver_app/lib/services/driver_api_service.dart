@@ -739,6 +739,31 @@ class DriverApiService extends GetxService {
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
+  /// Choose where the run ends.
+  ///
+  /// [mode] is 'hub' (back to pickup), 'open' (wherever the last stop falls)
+  /// or 'address'. In address mode send either [endAddress] for the server to
+  /// look up, or an exact [endLat]/[endLng] picked on a map.
+  Future<Map<String, dynamic>> setRouteFinish(
+    int routeId, {
+    required String mode,
+    String? endAddress,
+    double? endLat,
+    double? endLng,
+    String? endLabel,
+  }) async {
+    final body = await _ok(
+      await _client.authPost(ApiConfig.routeFinish(routeId), {
+        'mode': mode,
+        'end_address': ?endAddress,
+        'end_lat': ?endLat,
+        'end_lng': ?endLng,
+        'end_label': ?endLabel,
+      }),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
   Future<Map<String, dynamic>> scanPickup(
     int routeId, {
     required String barcode,

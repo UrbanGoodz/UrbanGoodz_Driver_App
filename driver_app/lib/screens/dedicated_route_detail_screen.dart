@@ -14,12 +14,19 @@ class DedicatedRouteDetailScreen extends StatefulWidget {
 
 class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen> {
   final DedicatedRouteController controller = Get.find<DedicatedRouteController>();
-  String _selectedPreference = 'no_preference';
+  final TextEditingController _finishAddressController = TextEditingController();
+  String _finishMode = 'open';
 
   @override
   void initState() {
     super.initState();
     controller.fetchRouteDetail(widget.routeId);
+  }
+
+  @override
+  void dispose() {
+    _finishAddressController.dispose();
+    super.dispose();
   }
 
   @override
@@ -111,10 +118,11 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // Resequencing preferences
+                    // Where the run ends. The optimiser adds a final leg to
+                    // this point, so the last stop lands nearest to it.
                     if (route.canResequence) ...[
                       const Text(
-                        'Resequence Stop Order',
+                        'Where does this run end?',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 10),
@@ -127,30 +135,50 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Select your preferred ending point:',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                'Stops are ordered from the pickup to whichever stop is closest to your finish.',
+                                style: TextStyle(fontSize: 13, color: Colors.black54),
                               ),
                               const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                value: _selectedPreference,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'no_preference', child: Text('No Preference (Open Loop)')),
-                                  DropdownMenuItem(value: 'company_endpoint', child: Text('Return to Company Endpoint')),
-                                  DropdownMenuItem(value: 'return_to_pickup', child: Text('Return to Pickup Hub')),
-                                  DropdownMenuItem(value: 'private_endpoint', child: Text('Ending at Approved Home Address')),
-                                ],
+                              RadioGroup<String>(
+                                groupValue: _finishMode,
                                 onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => _selectedPreference = val);
-                                  }
+                                  if (val != null) setState(() => _finishMode = val);
                                 },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    for (final option in const [
+                                      ('open', 'No fixed finish', 'End wherever the last stop falls'),
+                                      ('hub', 'Back at the pickup hub', 'Return to where the route started'),
+                                      ('address', 'At an address', 'Type where you want to finish'),
+                                    ])
+                                      RadioListTile<String>(
+                                        value: option.$1,
+                                        contentPadding: EdgeInsets.zero,
+                                        dense: true,
+                                        title: Text(option.$2, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                        subtitle: Text(option.$3, style: const TextStyle(fontSize: 12)),
+                                      ),
+                                  ],
+                                ),
                               ),
+                              if (_finishMode == 'address') ...[
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: _finishAddressController,
+                                  textInputAction: TextInputAction.done,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. 2800 Post Oak Blvd, Houston, TX 77056',
+                                    labelText: 'Finish address',
+                                    helperText: 'Include the city and ZIP so it matches the right street.',
+                                    helperMaxLines: 2,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 16),
                               SizedBox(
                                 width: double.infinity,
@@ -160,10 +188,28 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
-                                  icon: const Icon(Icons.gesture, color: Colors.white),
-                                  label: const Text('Optimize Stop Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  icon: const Icon(Icons.alt_route, color: Colors.white),
+                                  label: const Text('Sort Stops To Finish', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                   onPressed: () {
-                                    controller.resequenceRoute(route.id, _selectedPreference);
+                                    final address = _finishAddressController.text.trim();
+
+                                    // The server refuses address mode without
+                                    // one, but saying so here saves a round
+                                    // trip and an error toast.
+                                    if (_finishMode == 'address' && address.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Enter the address you want to finish at.'),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    controller.setRouteFinish(
+                                      route.id,
+                                      mode: _finishMode,
+                                      endAddress: _finishMode == 'address' ? address : null,
+                                    );
                                   },
                                 ),
                               ),
