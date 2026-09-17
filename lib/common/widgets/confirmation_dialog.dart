@@ -36,7 +36,12 @@ class ConfirmationDialog extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeLarge),
               child: Text(
                 title!, textAlign: TextAlign.center,
-                style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeExtraLarge, color: Colors.red),
+                // Was hardcoded Colors.red on every confirmation, including
+                // ones with no destructive meaning (this dialog also drives
+                // plain "confirm"/log-out prompts) -- red also isn't part of
+                // the core brand palette. A normal strong heading color reads
+                // as "pay attention" without implying an error state.
+                style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeExtraLarge, color: Theme.of(context).textTheme.bodyLarge!.color),
               ),
             ) : const SizedBox(),
 

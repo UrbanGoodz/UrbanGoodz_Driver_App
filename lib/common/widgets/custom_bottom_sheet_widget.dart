@@ -9,7 +9,9 @@ void showCustomBottomSheet({required Widget child, double? height}) {
       child: child,
     ),
     isScrollControlled: true, useRootNavigator: true,
-    backgroundColor: Colors.white,
+    // Was hardcoded Colors.white -- rendered a light-mode-only sheet with
+    // white chrome over dark-mode content behind it.
+    backgroundColor: Theme.of(Get.context!).cardColor,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.only(topLeft: Radius.circular(Dimensions.radiusExtraLarge), topRight: Radius.circular(Dimensions.radiusExtraLarge)),
     ),

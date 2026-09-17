@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sixam_mart/common/widgets/add_favourite_view.dart';
+import 'package:sixam_mart/common/widgets/custom_card.dart';
 import 'package:sixam_mart/common/widgets/custom_ink_well.dart';
 import 'package:sixam_mart/common/widgets/hover/text_hover.dart';
 import 'package:sixam_mart/common/widgets/not_available_widget.dart';
@@ -10,7 +11,6 @@ import 'package:sixam_mart/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart/features/store/controllers/store_controller.dart';
 import 'package:sixam_mart/common/models/module_model.dart';
 import 'package:sixam_mart/features/store/domain/models/store_model.dart';
-import 'package:sixam_mart/helper/responsive_helper.dart';
 import 'package:sixam_mart/helper/route_helper.dart';
 import 'package:sixam_mart/util/app_constants.dart';
 import 'package:sixam_mart/util/dimensions.dart';
@@ -19,6 +19,7 @@ import 'package:sixam_mart/util/styles.dart';
 import 'package:sixam_mart/common/widgets/custom_image.dart';
 import 'package:sixam_mart/common/widgets/new_tag.dart';
 import 'package:sixam_mart/common/widgets/rating_bar.dart';
+import 'package:sixam_mart/common/widgets/status_chip.dart';
 import 'package:sixam_mart/features/store/screens/store_screen.dart';
 
 class StoreCard extends StatelessWidget {
@@ -42,11 +43,10 @@ class StoreCard extends StatelessWidget {
 
       Container(
         width: 300,
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-          boxShadow: ResponsiveHelper.isMobile(context) ? [BoxShadow(color: Theme.of(context).disabledColor.withValues(alpha: 0.2), blurRadius: 5, spreadRadius: 1)] : null,
-        ),
+        // Previously had no shadow at all on desktop/web and a different,
+        // one-off shadow recipe on mobile -- now the same CustomCard
+        // treatment every other card surface uses, on every platform.
+        decoration: CustomCard.decoration(context, radius: Dimensions.radiusDefault),
         child: CustomInkWell(
           onTap: () {
             if(Get.find<SplashController>().moduleList != null) {
@@ -144,74 +144,33 @@ class StoreCard extends StatelessWidget {
                   ),
                   Expanded(
                     flex: 2,
-                    child: isTopOffers! ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeExtraSmall, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
+                    child: isTopOffers! ? Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      StatusChip.subtle(context,
+                        label: '${AppConstants.formattedDistance(distance)} ${'from_you'.tr}',
+                        leading: Image.asset(Images.distanceLine, height: 15, width: 15, color: Theme.of(context).disabledColor),
                       ),
-                      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Row(children: [
-                          const SizedBox(width: Dimensions.paddingSizeExtraSmall),
+                      StatusChip.solid(context,
+                        label: discount > 0 ? '${(isRightSide || discountType == 'percent') ? '' : currencySymbol}$discount${discountType == 'percent' ? '%'
+                            : isRightSide ? currencySymbol : ''} ${'off'.tr}' : 'free_delivery'.tr,
+                      ),
+                    ]) : Row(children: [
 
-                          Image.asset(Images.distanceLine, height: 15, width: 15, color: Theme.of(context).disabledColor,),
-                          const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                          Text(AppConstants.formattedDistance(distance), style: robotoBold.copyWith(color: Theme.of(context).disabledColor, fontSize: Dimensions.fontSizeSmall)),
-                          const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                          Text('from_you'.tr, style: robotoRegular.copyWith(color: Theme.of(context).disabledColor, fontSize: Dimensions.fontSizeSmall)),
-                        ]),
-
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: 3),
-                          child: Text(
-                            discount > 0 ? '${(isRightSide || discountType == 'percent') ? '' : currencySymbol}$discount${discountType == 'percent' ? '%'
-                                : isRightSide ? currencySymbol : ''} ${'off'.tr}' : 'free_delivery'.tr,
-                            style: robotoMedium.copyWith(color: Theme.of(context).cardColor, fontSize: Dimensions.fontSizeSmall),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      ]),
-
-                    ) : Row(children: [
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).disabledColor.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
-                        ),
-                        child: Row(children: [
-
-                          Image.asset(Images.distanceLine, height: 15, width: 15, color: Theme.of(context).textTheme.bodyLarge!.color,),
-                          const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                          Text(AppConstants.formattedDistance(distance), style: robotoBold.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color, fontSize: Dimensions.fontSizeSmall)),
-                          const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                          Text('from_you'.tr, style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color, fontSize: Dimensions.fontSizeSmall)),
-                        ]),
+                      StatusChip.subtle(context,
+                        label: '${AppConstants.formattedDistance(distance)} ${'from_you'.tr}',
+                        leading: Image.asset(Images.distanceLine, height: 15, width: 15, color: Theme.of(context).textTheme.bodyLarge!.color),
                       ),
                       const Spacer(),
 
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
-                        ),
-                        child: Row(children: [
-
-                          Image.asset(Images.clockIcon, height: 15, width: 15, color: Get.find<StoreController>().isOpenNow(store) ? const Color(0xffECA507) : Theme.of(context).colorScheme.error),
-                          const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                          Text(Get.find<StoreController>().isOpenNow(store) ? 'open_now'.tr : 'closed_now'.tr, style: robotoBold.copyWith(color: Get.find<StoreController>().isOpenNow(store) ? const Color(0xffECA507) : Theme.of(context).colorScheme.error, fontSize: Dimensions.fontSizeSmall)),
-                        ]),
+                      // "Closed" is a muted/disabled state, not an alarm --
+                      // it previously used colorScheme.error, which in this
+                      // theme is aliased to the brand amber itself (the same
+                      // color "open" used), so closed and open read almost
+                      // identically. disabledColor is already in the
+                      // palette; no new color introduced.
+                      StatusChip.subtle(context,
+                        label: Get.find<StoreController>().isOpenNow(store) ? 'open_now'.tr : 'closed_now'.tr,
+                        textColor: Get.find<StoreController>().isOpenNow(store) ? Theme.of(context).primaryColor : Theme.of(context).disabledColor,
+                        leading: Image.asset(Images.clockIcon, height: 15, width: 15, color: Get.find<StoreController>().isOpenNow(store) ? Theme.of(context).primaryColor : Theme.of(context).disabledColor),
                       ),
                     ]),
                   ),

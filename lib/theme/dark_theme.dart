@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sixam_mart/util/app_constants.dart';
+import 'package:sixam_mart/util/dimensions.dart';
 
 ThemeData dark({Color color = const Color(0xFFED9914)}) => ThemeData(
   fontFamily: AppConstants.fontFamily,
@@ -14,6 +15,26 @@ ThemeData dark({Color color = const Color(0xFFED9914)}) => ThemeData(
   shadowColor: Colors.white.withValues(alpha: 0.03),
   textTheme: const TextTheme(bodyMedium: TextStyle(color: Colors.white70)),
   textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: AppConstants.seasoningOrange)),
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppConstants.seasoningOrange,
+      foregroundColor: AppConstants.ugBlack,
+      disabledBackgroundColor: AppConstants.canvas.withValues(alpha: 0.15),
+      disabledForegroundColor: Colors.white38,
+      elevation: 2,
+      shadowColor: AppConstants.seasoningOrange.withValues(alpha: 0.45),
+      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeLarge, vertical: Dimensions.paddingSizeSmall),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusDefault)),
+    ),
+  ),
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: AppConstants.seasoningOrange,
+      side: BorderSide(color: AppConstants.seasoningOrange.withValues(alpha: 0.5), width: 1),
+      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeLarge, vertical: Dimensions.paddingSizeSmall),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusDefault)),
+    ),
+  ),
   popupMenuTheme: PopupMenuThemeData(color: AppConstants.ugBlack, surfaceTintColor: AppConstants.ugBlack),
   dialogTheme: const DialogThemeData(surfaceTintColor: Colors.white10),
   floatingActionButtonTheme: FloatingActionButtonThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(500))),

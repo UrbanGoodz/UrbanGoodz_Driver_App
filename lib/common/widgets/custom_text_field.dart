@@ -129,17 +129,25 @@ class CustomTextFieldState extends State<CustomTextField> {
           inputFormatters: widget.inputType == TextInputType.phone ? <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp('[0-9]'))]
               : widget.isAmount ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))] : widget.isNumber ? [FilteringTextInputFormatter.allow(RegExp(r'\d'))] : null,
           decoration: InputDecoration(
+            // Widths bumped from the previous 0.3-0.7 hairline up to 1/1.5 --
+            // a border that thin reads as barely-there rather than a
+            // deliberate, premium field outline, especially on web/desktop.
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              borderSide: BorderSide(style: widget.showBorder ? BorderStyle.solid : BorderStyle.none, width: ResponsiveHelper.isDesktop(context) ? 0.7 : 0.3, color: Theme.of(context).disabledColor),
+              borderSide: BorderSide(style: widget.showBorder ? BorderStyle.solid : BorderStyle.none, width: ResponsiveHelper.isDesktop(context) ? 1.2 : 1, color: Theme.of(context).disabledColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              borderSide: BorderSide(style: widget.showBorder ? BorderStyle.solid : BorderStyle.none, width: 1, color: Theme.of(context).primaryColor),
+              borderSide: BorderSide(style: widget.showBorder ? BorderStyle.solid : BorderStyle.none, width: 1.5, color: Theme.of(context).primaryColor),
             ),
+            // Was width 0.3 with primaryColor -- an almost-invisible amber
+            // hairline shown only when neither enabled/focused/disabled/error
+            // states apply. Matched to enabledBorder's own color for
+            // consistency; this fallback is rarely the one Flutter actually
+            // paints, but it should agree with the border next to it.
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              borderSide: BorderSide(style: widget.showBorder ? BorderStyle.solid : BorderStyle.none, width: 0.3, color: Theme.of(context).primaryColor),
+              borderSide: BorderSide(style: widget.showBorder ? BorderStyle.solid : BorderStyle.none, width: 1, color: Theme.of(context).disabledColor),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(Dimensions.radiusDefault),

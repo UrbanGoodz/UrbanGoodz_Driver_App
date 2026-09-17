@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart/common/widgets/custom_asset_image_widget.dart';
+import 'package:sixam_mart/common/widgets/custom_card.dart';
 import 'package:sixam_mart/common/widgets/custom_ink_well.dart';
 import 'package:sixam_mart/common/widgets/hover/text_hover.dart';
 import 'package:sixam_mart/features/item/controllers/item_controller.dart';
 import 'package:sixam_mart/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart/features/item/domain/models/item_model.dart';
 import 'package:sixam_mart/helper/price_converter.dart';
+import 'package:sixam_mart/util/app_constants.dart';
 import 'package:sixam_mart/util/dimensions.dart';
 import 'package:sixam_mart/util/images.dart';
 import 'package:sixam_mart/util/styles.dart';
@@ -37,10 +39,10 @@ class ItemCard extends StatelessWidget {
       child: Stack(children: [
         Container(
           width: 200,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            color: Theme.of(context).cardColor,
-          ),
+          // Previously a flat fill with no border/shadow -- every other
+          // card family in the app carries CustomCard's depth, this one
+          // was the outlier.
+          decoration: CustomCard.decoration(context, radius: Dimensions.radiusLarge),
           child: CustomInkWell(
             onTap: () => Get.find<ItemController>().navigateToItemPage(item, context),
             radius: Dimensions.radiusLarge,
@@ -144,7 +146,7 @@ class ItemCard extends StatelessWidget {
                                 style: robotoBold, maxLines: 1, overflow: TextOverflow.ellipsis,
                               ),
                             ) : item.ratingCount! > 0 ? Row(mainAxisAlignment: isPopularItem ? MainAxisAlignment.center : MainAxisAlignment.start, children: [
-                              Icon(Icons.star, size: 14, color: const Color(0xFFED9914)),
+                              Icon(Icons.star, size: 14, color: AppConstants.seasoningOrange),
                               const SizedBox(width: Dimensions.paddingSizeExtraSmall),
 
                               Text(item.avgRating!.toStringAsFixed(1), style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall)),
@@ -155,7 +157,7 @@ class ItemCard extends StatelessWidget {
 
                             // showUnitOrRattings(context);
                             (isFood || isShop) ? item.ratingCount! > 0 ? Row(mainAxisAlignment: isPopularItem ? MainAxisAlignment.center : MainAxisAlignment.start, children: [
-                              Icon(Icons.star, size: 14, color: const Color(0xFFED9914)),
+                              Icon(Icons.star, size: 14, color: AppConstants.seasoningOrange),
                               const SizedBox(width: Dimensions.paddingSizeExtraSmall),
 
                               Text(item.avgRating!.toStringAsFixed(1), style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall)),

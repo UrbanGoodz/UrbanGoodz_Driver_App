@@ -35,8 +35,11 @@ class VisitAgainCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
               color: Theme.of(context).cardColor,
+              // The amber border is intentional here (it echoes the logo
+              // avatar's own accent ring below), kept as-is -- only the
+              // shadow recipe is brought in line with CustomCard's.
               border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.2), width: 1),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 1)],
+              boxShadow: [BoxShadow(color: Get.isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06), blurRadius: 18, offset: const Offset(0, 6))],
             ),
             child: CustomInkWell(
               onTap: () {
@@ -57,7 +60,7 @@ class VisitAgainCard extends StatelessWidget {
                 ]),
 
                 store.ratingCount! > 0 ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.star, size: 15, color: const Color(0xFFED9914)),
+                  const Icon(Icons.star, size: 15, color: AppConstants.seasoningOrange),
                   const SizedBox(width: Dimensions.paddingSizeExtraSmall),
 
                   Text(store.avgRating!.toStringAsFixed(1), style: robotoRegular),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sixam_mart/util/app_constants.dart';
+import 'package:sixam_mart/util/dimensions.dart';
 
 ThemeData light({Color color = const Color(0xFFED9914)}) => ThemeData(
   fontFamily: AppConstants.fontFamily,
@@ -13,6 +14,32 @@ ThemeData light({Color color = const Color(0xFFED9914)}) => ThemeData(
   cardColor: AppConstants.ugWhite,
   shadowColor: AppConstants.ugBlack.withValues(alpha: 0.03),
   textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: AppConstants.seasoningOrange)),
+  // Every raw ElevatedButton/OutlinedButton in the app (there are dozens
+  // that don't go through CustomButton) inherits this automatically -- no
+  // call site changes needed for the premium treatment to reach them.
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppConstants.seasoningOrange,
+      // Dark text, not white: seasoningOrange (0xFFED9914) is bright enough
+      // that white fails contrast on it in both themes -- the button fill
+      // is the same amber regardless of overall theme brightness.
+      foregroundColor: AppConstants.ugBlack,
+      disabledBackgroundColor: AppConstants.canvas,
+      disabledForegroundColor: AppConstants.ugBlack.withValues(alpha: 0.4),
+      elevation: 2,
+      shadowColor: AppConstants.seasoningOrange.withValues(alpha: 0.35),
+      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeLarge, vertical: Dimensions.paddingSizeSmall),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusDefault)),
+    ),
+  ),
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: AppConstants.seasoningOrange,
+      side: BorderSide(color: AppConstants.seasoningOrange.withValues(alpha: 0.5), width: 1),
+      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeLarge, vertical: Dimensions.paddingSizeSmall),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusDefault)),
+    ),
+  ),
   popupMenuTheme: const PopupMenuThemeData(color: Colors.white, surfaceTintColor: Colors.white),
   dialogTheme: const DialogThemeData(surfaceTintColor: Colors.white),
   floatingActionButtonTheme: FloatingActionButtonThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(500))),

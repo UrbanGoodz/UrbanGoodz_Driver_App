@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:sixam_mart/util/app_constants.dart';
 import 'package:sixam_mart/util/dimensions.dart';
 import 'package:sixam_mart/util/styles.dart';
 import 'package:flutter/material.dart';
@@ -25,11 +26,22 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isPrimary = onPressed != null && !transparent;
+    // seasoningOrange (the default, un-overridden fill) is bright enough
+    // that white fails contrast on it -- dark text instead, same call
+    // ElevatedButtonThemeData now makes for raw ElevatedButtons. A caller
+    // that passes its own `color` may have picked something dark on
+    // purpose, so white stays the fallback there.
+    final Color onFillColor = (color == null) ? AppConstants.ugBlack : AppConstants.ugWhite;
     final ButtonStyle flatButtonStyle = TextButton.styleFrom(
-      backgroundColor: onPressed == null ? Color(0xff93A2AE) : transparent
+      // Was a hardcoded Color(0xff93A2AE) -- an off-palette blue-grey with
+      // no relationship to the brand or the theme's own disabled token.
+      backgroundColor: onPressed == null ? Theme.of(context).disabledColor.withValues(alpha: 0.5) : transparent
           ? Colors.transparent : color ?? Theme.of(context).primaryColor,
       minimumSize: Size(width != null ? width! : Dimensions.webMaxWidth, height != null ? height! : 50),
       padding: EdgeInsets.zero,
+      elevation: isPrimary ? 2 : 0,
+      shadowColor: Theme.of(context).primaryColor.withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radius),
         side: isBorder ? BorderSide(color: Theme.of(context).disabledColor.withValues(alpha: 0.5)) : BorderSide.none,
@@ -43,27 +55,30 @@ class CustomButton extends StatelessWidget {
         style: flatButtonStyle,
         child: isLoading ?
         Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const SizedBox(
+          SizedBox(
             height: 15, width: 15,
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(onFillColor),
               strokeWidth: 2,
             ),
         ),
           const SizedBox(width: Dimensions.paddingSizeSmall),
 
-          Text('loading'.tr, style: robotoMedium.copyWith(color: Colors.white)),
+          Text('loading'.tr, style: robotoMedium.copyWith(color: onFillColor)),
         ]),
         ) : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           icon != null ? Padding(
             padding: const EdgeInsets.only(right: Dimensions.paddingSizeExtraSmall),
-            child: Icon(icon, color: transparent ? Theme.of(context).primaryColor : Theme.of(context).cardColor),
+            // Was Theme.of(context).cardColor -- in dark theme that's
+            // ugBlack, an all-but-invisible icon on the same amber fill the
+            // text sits on right next to it.
+            child: Icon(icon, color: transparent ? Theme.of(context).primaryColor : onFillColor),
           ) : const SizedBox(),
           Text(buttonText, textAlign: TextAlign.center, style: (textStyle != null) ? textStyle : isBold ? robotoBold.copyWith(
-            color: textColor ?? (transparent ? Theme.of(context).primaryColor : Colors.white),
+            color: textColor ?? (transparent ? Theme.of(context).primaryColor : onFillColor),
             fontSize: fontSize ?? Dimensions.fontSizeLarge,
           ) : robotoRegular.copyWith(
-            color: textColor ?? (transparent ? Theme.of(context).primaryColor : Colors.white),
+            color: textColor ?? (transparent ? Theme.of(context).primaryColor : onFillColor),
             fontSize: fontSize ?? Dimensions.fontSizeLarge,
           )),
         ]),
