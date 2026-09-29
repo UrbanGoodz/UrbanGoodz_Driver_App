@@ -18,7 +18,13 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.urbangoodz.driver"
+        // com.urbaneatz.driver, not com.urbangoodz.driver: the live Play
+        // listing is com.urbaneatz.driver and a different applicationId is a
+        // different app to Google, so building the urbangoodz id would create
+        // a second listing and strand the existing installs with no update
+        // path. google-services.json already carries a client for this id.
+        // namespace above stays as-is - it is the code package, not the app id.
+        applicationId = "com.urbaneatz.driver"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
