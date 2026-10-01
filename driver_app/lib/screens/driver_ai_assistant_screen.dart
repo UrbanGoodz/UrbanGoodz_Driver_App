@@ -122,7 +122,7 @@ class _DriverAiAssistantScreenState extends State<DriverAiAssistantScreen> {
                   _quietHoursEnabled = val;
                 });
               },
-              activeColor: AppTheme.primary,
+              activeThumbColor: AppTheme.primary,
             )
           ],
         ),

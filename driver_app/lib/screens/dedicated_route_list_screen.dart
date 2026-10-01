@@ -119,7 +119,7 @@ class _DedicatedRouteListScreenState extends State<DedicatedRouteListScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: _getStatusColor(route.status).withOpacity(0.15),
+                                            color: _getStatusColor(route.status).withValues(alpha: 0.15),
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(

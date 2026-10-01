@@ -32,7 +32,7 @@ class DedicatedRouteController extends GetxController {
         title,
         message,
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: backgroundColor ?? Colors.black.withOpacity(0.8),
+        backgroundColor: backgroundColor ?? Colors.black.withValues(alpha: 0.8),
         colorText: colorText ?? Colors.white,
         duration: duration,
       );
@@ -69,7 +69,7 @@ class DedicatedRouteController extends GetxController {
     _showSnackbar(
       'Offline Mode',
       'Action saved locally. It will sync when online.',
-      backgroundColor: Colors.orange.withOpacity(0.9),
+      backgroundColor: Colors.orange.withValues(alpha: 0.9),
       colorText: Colors.white,
     );
   }
@@ -133,7 +133,7 @@ class DedicatedRouteController extends GetxController {
       _showSnackbar(
         'Sync Complete',
         'All offline scans and updates synchronized successfully!',
-        backgroundColor: Colors.green.withOpacity(0.9),
+        backgroundColor: Colors.green.withValues(alpha: 0.9),
         colorText: Colors.white,
       );
       if (currentRoute.value != null) {
@@ -143,7 +143,7 @@ class DedicatedRouteController extends GetxController {
       _showSnackbar(
         'Sync Incomplete',
         'Failed to sync ${failed.length} items. Will retry later.',
-        backgroundColor: Colors.red.withOpacity(0.9),
+        backgroundColor: Colors.red.withValues(alpha: 0.9),
         colorText: Colors.white,
       );
     }

@@ -262,7 +262,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: _driverWorkstreams.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
                         itemBuilder: (ctx, idx) {
                           return Container(
                             padding: const EdgeInsets.symmetric(
@@ -270,10 +270,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: AppTheme.primary.withOpacity(0.3),
+                                color: AppTheme.primary.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
@@ -304,7 +304,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                     // Main Auth Card Container
                     Card(
                       elevation: 6,
-                      shadowColor: Colors.black.withOpacity(0.08),
+                      shadowColor: Colors.black.withValues(alpha: 0.08),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -327,10 +327,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                     margin: const EdgeInsets.only(bottom: 16),
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.08),
+                                      color: Colors.red.withValues(alpha: 0.08),
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(
-                                        color: Colors.red.withOpacity(0.3),
+                                        color: Colors.red.withValues(alpha: 0.3),
                                       ),
                                     ),
                                     child: Row(
@@ -472,6 +472,13 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                         const Flexible(
                                           child: Text(
                                             'Remember me',
+                                            // Without this the label breaks
+                                            // mid-word into "Rememb / er me"
+                                            // at 720dp once Forgot Password?
+                                            // has taken its share of the row.
+                                            maxLines: 1,
+                                            softWrap: false,
+                                            overflow: TextOverflow.visible,
                                             style: TextStyle(
                                               fontSize: 13,
                                               color: AppTheme.dark,
@@ -483,6 +490,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                   ),
                                   TextButton(
                                     key: const Key('driver_forgot_password'),
+                                    // Default TextButton padding is wide enough
+                                    // to squeeze the label beside it into
+                                    // wrapping; give that space back.
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
                                     onPressed: _showForgotPasswordDialog,
                                     child: const Text(
                                       'Forgot Password?',

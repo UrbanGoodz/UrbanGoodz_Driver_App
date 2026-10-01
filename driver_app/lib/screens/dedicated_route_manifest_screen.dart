@@ -340,7 +340,7 @@ class _StopCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _getPackageStatusColor(pkg.status).withOpacity(0.15),
+                            color: _getPackageStatusColor(pkg.status).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -497,7 +497,7 @@ class _StopCard extends StatelessWidget {
           return AlertDialog(
             title: Text('Record Exception (Stop #${stop.stopOrder})'),
             content: DropdownButtonFormField<String>(
-              value: selectedReason,
+              initialValue: selectedReason,
               items: reasons.entries.map((e) {
                 return DropdownMenuItem(value: e.key, child: Text(e.value));
               }).toList(),
