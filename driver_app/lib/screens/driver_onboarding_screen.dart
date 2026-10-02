@@ -446,15 +446,23 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
                               const SizedBox(height: 8),
 
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              // Wrap, not Row: at the device font scales people
+                              // actually use (this was found at 1.5x, with the
+                              // display density also overridden) "Remember me"
+                              // and "Forgot Password?" genuinely cannot share
+                              // one line. A Row can only degrade badly there -
+                              // it either breaks the label mid-word into
+                              // "Rememb / er me", ellipsizes it to "Rememb...",
+                              // or paints one child over the other. Wrap moves
+                              // the second item to its own line instead, so the
+                              // text stays whole at every scale.
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
                                 children: [
-                                  // Flexible so the row degrades gracefully on
-                                  // narrow phones and at large text scales
-                                  // instead of overflowing.
-                                  Flexible(
-                                    child: Row(
+                                  Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         SizedBox(
@@ -469,25 +477,23 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        const Flexible(
-                                          child: Text(
-                                            'Remember me',
-                                            // Without this the label breaks
-                                            // mid-word into "Rememb / er me"
-                                            // at 720dp once Forgot Password?
-                                            // has taken its share of the row.
-                                            maxLines: 1,
-                                            softWrap: false,
-                                            overflow: TextOverflow.visible,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: AppTheme.dark,
-                                            ),
+                                        // No Flexible here: Wrap hands its
+                                        // children unbounded width, and a flex
+                                        // child inside an unbounded Row throws
+                                        // at layout time. The label takes its
+                                        // natural width and Wrap moves the
+                                        // button to the next line when the two
+                                        // no longer fit.
+                                        const Text(
+                                          'Remember me',
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: AppTheme.dark,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
                                   TextButton(
                                     key: const Key('driver_forgot_password'),
                                     // Default TextButton padding is wide enough
