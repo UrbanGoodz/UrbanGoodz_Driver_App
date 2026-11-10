@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:urban_goodz_driver/utils/driver_notice.dart';
 import 'package:urban_goodz_driver/models/driver_job_model.dart';
 import 'package:urban_goodz_driver/models/job_lifecycle.dart';
+import 'package:urban_goodz_driver/services/api_client.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
 
 class ActiveJobsController extends GetxController {
@@ -95,10 +96,11 @@ class ActiveJobsController extends GetxController {
         'Pickup recorded.',
       );
 
-  Future<void> completeJob(String id) => _transition(
+  Future<void> completeJob(String id, {String? recipientName}) => _transition(
         id,
         JobTransition.deliver,
-        (jobId) => _api.completeActiveJob(jobId),
+        (jobId) =>
+            _api.completeActiveJob(jobId, recipientName: recipientName),
         'Delivery complete.',
       );
 
@@ -182,6 +184,10 @@ class ActiveJobsController extends GetxController {
       );
     } catch (e) {
       lastOutcome.value = TransitionOutcome.failed;
+      if (e is ApiException && e.code == 'recipient_required') {
+        _fail('Enter the name of the person who received the delivery.');
+        return;
+      }
       _fail('Failed: $e');
     }
   }

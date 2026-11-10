@@ -176,11 +176,17 @@ class ApiException implements Exception {
 
     if (status == 429) retryAfter ??= 60;
 
+    // Some endpoints (e.g. job completion 422 `recipient_required`) put the
+    // code at the top level of the body instead of inside `errors`.
+    final topCode = (body is Map && body['code'] is String)
+        ? body['code'] as String
+        : '';
+
     return ApiException(
       status,
       resolved,
       errors: parsed,
-      code: parsed.isNotEmpty ? parsed.first.code : '',
+      code: parsed.isNotEmpty ? parsed.first.code : topCode,
       retryAfterSeconds: retryAfter,
     );
   }

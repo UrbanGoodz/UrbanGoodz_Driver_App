@@ -413,9 +413,15 @@ class DriverApiService extends GetxService {
         : {};
   }
 
-  Future<Map<String, dynamic>> completeActiveJob(int jobId) async {
+  Future<Map<String, dynamic>> completeActiveJob(
+    int jobId, {
+    String? recipientName,
+  }) async {
+    final name = recipientName?.trim() ?? '';
     final body = await _ok(
-      await _client.authPost(ApiConfig.activeJobComplete(jobId), {}),
+      await _client.authPost(ApiConfig.activeJobComplete(jobId), {
+        if (name.isNotEmpty) 'recipient_name': name,
+      }),
     );
     return (body is Map && body['job'] is Map)
         ? Map<String, dynamic>.from(body['job'])

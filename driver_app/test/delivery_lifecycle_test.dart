@@ -449,6 +449,54 @@ void main() {
       expect(c.lastOutcome.value, TransitionOutcome.success);
     });
 
+    test('complete passes recipient_name through when provided', () async {
+      await loadJob(JobStatus.pickedUp);
+      client.stub(
+        '$_base/active-jobs/11/complete',
+        ok({
+          'job': {'status': JobStatus.delivered},
+        }),
+      );
+
+      await c.completeJob('11', recipientName: '  Jane Doe ');
+
+      final call = client.calls.lastWhere((c) => c.method == 'POST');
+      expect(call.path, '$_base/active-jobs/11/complete');
+      expect(call.body, {'recipient_name': 'Jane Doe'});
+    });
+
+    test('complete sends an empty body without a recipient', () async {
+      await loadJob(JobStatus.pickedUp);
+      client.stub(
+        '$_base/active-jobs/11/complete',
+        ok({
+          'job': {'status': JobStatus.delivered},
+        }),
+      );
+
+      await c.completeJob('11', recipientName: '   ');
+
+      expect(
+        client.calls.lastWhere((c) => c.method == 'POST').body,
+        <String, dynamic>{},
+      );
+    });
+
+    test('422 recipient_required shows the friendly message', () async {
+      await loadJob(JobStatus.pickedUp);
+      client.stub(
+        '$_base/active-jobs/11/complete',
+        const Response(
+          statusCode: 422,
+          body: {'message': 'Recipient required', 'code': 'recipient_required'},
+        ),
+      );
+
+      await c.completeJob('11');
+
+      expect(c.lastOutcome.value, TransitionOutcome.failed);
+    });
+
     test('refuses to act on a job the driver does not hold', () async {
       await loadJob(JobStatus.pickedUp);
 
