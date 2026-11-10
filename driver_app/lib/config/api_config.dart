@@ -111,16 +111,24 @@ class ApiConfig {
 
   // Active Jobs (6)
   static const String activeJobs = '$driverApiPrefix/active-jobs';
-  static String activeJobDetail(int jobId) =>
-      '$driverApiPrefix/active-jobs/$jobId';
-  static String activeJobStart(int jobId) =>
-      '$driverApiPrefix/active-jobs/$jobId/start';
-  static String activeJobComplete(int jobId) =>
-      '$driverApiPrefix/active-jobs/$jobId/complete';
-  static String activeJobCancel(int jobId) =>
-      '$driverApiPrefix/active-jobs/$jobId/cancel';
-  static String activeJobStatus(int jobId) =>
-      '$driverApiPrefix/active-jobs/$jobId/status';
+  /// Appends `?source=` (URL-encoded) so the backend knows which table the
+  /// numeric job id belongs to. Null/empty leaves the URL untouched.
+  static String withJobSource(String url, String? source) {
+    final s = source?.trim() ?? '';
+    if (s.isEmpty) return url;
+    return '$url${url.contains('?') ? '&' : '?'}source=${Uri.encodeQueryComponent(s)}';
+  }
+
+  static String activeJobDetail(int jobId, {String? source}) =>
+      withJobSource('$driverApiPrefix/active-jobs/$jobId', source);
+  static String activeJobStart(int jobId, {String? source}) =>
+      withJobSource('$driverApiPrefix/active-jobs/$jobId/start', source);
+  static String activeJobComplete(int jobId, {String? source}) =>
+      withJobSource('$driverApiPrefix/active-jobs/$jobId/complete', source);
+  static String activeJobCancel(int jobId, {String? source}) =>
+      withJobSource('$driverApiPrefix/active-jobs/$jobId/cancel', source);
+  static String activeJobStatus(int jobId, {String? source}) =>
+      withJobSource('$driverApiPrefix/active-jobs/$jobId/status', source);
 
   // Load Board (2)
   static const String loadBoard = '$driverApiPrefix/load-board';

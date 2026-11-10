@@ -395,18 +395,24 @@ class DriverApiService extends GetxService {
     return raw.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  Future<Map<String, dynamic>> getActiveJobDetail(int jobId) async {
+  Future<Map<String, dynamic>> getActiveJobDetail(
+    int jobId, {
+    String? source,
+  }) async {
     final body = await _ok(
-      await _client.authGet(ApiConfig.activeJobDetail(jobId)),
+      await _client.authGet(ApiConfig.activeJobDetail(jobId, source: source)),
     );
     return (body is Map && body['job'] is Map)
         ? Map<String, dynamic>.from(body['job'])
         : {};
   }
 
-  Future<Map<String, dynamic>> startActiveJob(int jobId) async {
+  Future<Map<String, dynamic>> startActiveJob(
+    int jobId, {
+    String? source,
+  }) async {
     final body = await _ok(
-      await _client.authPost(ApiConfig.activeJobStart(jobId), {}),
+      await _client.authPost(ApiConfig.activeJobStart(jobId, source: source), {}),
     );
     return (body is Map && body['job'] is Map)
         ? Map<String, dynamic>.from(body['job'])
@@ -416,10 +422,11 @@ class DriverApiService extends GetxService {
   Future<Map<String, dynamic>> completeActiveJob(
     int jobId, {
     String? recipientName,
+    String? source,
   }) async {
     final name = recipientName?.trim() ?? '';
     final body = await _ok(
-      await _client.authPost(ApiConfig.activeJobComplete(jobId), {
+      await _client.authPost(ApiConfig.activeJobComplete(jobId, source: source), {
         if (name.isNotEmpty) 'recipient_name': name,
       }),
     );
@@ -428,19 +435,23 @@ class DriverApiService extends GetxService {
         : {};
   }
 
-  Future<Map<String, dynamic>> cancelActiveJob(int jobId) async {
+  Future<Map<String, dynamic>> cancelActiveJob(
+    int jobId, {
+    String? source,
+  }) async {
     final body = await _ok(
-      await _client.authPost(ApiConfig.activeJobCancel(jobId), {}),
+      await _client.authPost(ApiConfig.activeJobCancel(jobId, source: source), {}),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
   Future<Map<String, dynamic>> updateActiveJobStatus(
     int jobId,
-    String status,
-  ) async {
+    String status, {
+    String? source,
+  }) async {
     final body = await _ok(
-      await _client.authPost(ApiConfig.activeJobStatus(jobId), {
+      await _client.authPost(ApiConfig.activeJobStatus(jobId, source: source), {
         'driver_task_status': status,
       }),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:urban_goodz_driver/config/api_config.dart';
 import 'package:urban_goodz_driver/controllers/active_jobs_controller.dart';
 import 'package:urban_goodz_driver/controllers/business_job_controller.dart';
 import 'package:urban_goodz_driver/controllers/load_board_controller.dart';
@@ -364,6 +365,99 @@ void main() {
 
     test('arrival check-in is reported as unsupported, not offered', () {
       expect(c.arrivalCheckInSupported, isFalse);
+    });
+  });
+
+  // ------------------------------------------------------- job source
+
+  group('active-job source disambiguation', () {
+    late DriverApiService api;
+    setUp(() => api = Get.find<DriverApiService>());
+
+    test('with a source, every active-job call adds ?source=', () async {
+      for (final p in ['', '/start', '/complete', '/cancel', '/status']) {
+        client.stub('$_base/active-jobs/7$p?source=load_board', ok({'job': {}}));
+      }
+      await api.getActiveJobDetail(7, source: 'load_board');
+      await api.startActiveJob(7, source: 'load_board');
+      await api.completeActiveJob(7, recipientName: 'Sam', source: 'load_board');
+      await api.cancelActiveJob(7, source: 'load_board');
+      await api.updateActiveJobStatus(7, 'picked_up', source: 'load_board');
+
+      expect(client.calls.map((c) => c.path).toList(), [
+        '$_base/active-jobs/7?source=load_board',
+        '$_base/active-jobs/7/start?source=load_board',
+        '$_base/active-jobs/7/complete?source=load_board',
+        '$_base/active-jobs/7/cancel?source=load_board',
+        '$_base/active-jobs/7/status?source=load_board',
+      ]);
+      expect(client.calls[2].body['recipient_name'], 'Sam');
+    });
+
+    test('without a source (null or empty) the URL is unchanged', () async {
+      for (final p in ['', '/start', '/complete', '/cancel', '/status']) {
+        client.stub('$_base/active-jobs/7$p', ok({'job': {}}));
+      }
+      await api.getActiveJobDetail(7);
+      await api.startActiveJob(7, source: null);
+      await api.completeActiveJob(7, source: '');
+      await api.cancelActiveJob(7, source: '  ');
+      await api.updateActiveJobStatus(7, 'picked_up');
+
+      expect(client.calls.map((c) => c.path).toList(), [
+        '$_base/active-jobs/7',
+        '$_base/active-jobs/7/start',
+        '$_base/active-jobs/7/complete',
+        '$_base/active-jobs/7/cancel',
+        '$_base/active-jobs/7/status',
+      ]);
+    });
+
+    test('source value is URL-encoded', () {
+      expect(
+        ApiConfig.activeJobStart(1, source: 'a b&c'),
+        '$_base/active-jobs/1/start?source=a+b%26c',
+      );
+    });
+
+    test('controller sends the job\'s own source automatically', () async {
+      client.stub(
+        '$_base/active-jobs',
+        ok({
+          'jobs': [
+            activeJob('11', JobStatus.accepted)..['source'] = 'dedicated_route',
+          ],
+        }),
+        times: 4,
+      );
+      final c = ActiveJobsController();
+      await c.fetchActiveJobs();
+      expect(c.activeJobs.single.source, 'dedicated_route');
+      client.stub(
+        '$_base/active-jobs/11/start?source=dedicated_route',
+        ok({'job': {'status': JobStatus.enRoute}}),
+      );
+
+      await c.startJob('11');
+
+      expect(posted(), ['$_base/active-jobs/11/start?source=dedicated_route']);
+      expect(c.lastOutcome.value, TransitionOutcome.success);
+    });
+
+    test('controller without a job source posts the old URL', () async {
+      client.stub(
+        '$_base/active-jobs',
+        ok({'jobs': [activeJob('11', JobStatus.accepted)]}),
+        times: 4,
+      );
+      final c = ActiveJobsController();
+      await c.fetchActiveJobs();
+      client.stub(
+        '$_base/active-jobs/11/start',
+        ok({'job': {'status': JobStatus.enRoute}}),
+      );
+      await c.startJob('11');
+      expect(posted(), ['$_base/active-jobs/11/start']);
     });
   });
 

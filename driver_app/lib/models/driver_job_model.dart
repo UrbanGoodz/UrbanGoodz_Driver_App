@@ -23,6 +23,11 @@ class DriverJobModel {
   final List<String> tags;
   final Map<String, dynamic>? specialRequirements;
 
+  /// Which backend table the numeric [id] belongs to (`order_anywhere`,
+  /// `business_courier`, `dedicated_route`, `load_board`). Sent back as
+  /// `?source=` so the server does not guess between tables.
+  final String? source;
+
   DriverJobModel({
     required this.id,
     required this.type,
@@ -46,6 +51,7 @@ class DriverJobModel {
     this.isUrgent = false,
     this.tags = const [],
     this.specialRequirements,
+    this.source,
   });
 
   bool get hasCoordinates =>
@@ -81,6 +87,7 @@ class DriverJobModel {
           [],
       specialRequirements:
           json['special_requirements'] as Map<String, dynamic>?,
+      source: json['source']?.toString(),
     );
   }
 
@@ -108,6 +115,7 @@ class DriverJobModel {
       'is_urgent': isUrgent,
       'tags': tags,
       'special_requirements': specialRequirements,
+      if (source != null) 'source': source,
     };
   }
 }

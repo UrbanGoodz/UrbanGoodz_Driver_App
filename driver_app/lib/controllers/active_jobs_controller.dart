@@ -51,10 +51,8 @@ class ActiveJobsController extends GetxController {
   /// Job ids the driver actually holds, taken only from their own
   /// `active-jobs` response. Any id not in here is refused before the
   /// network is touched.
-  Set<int> get ownedJobIds => activeJobs
-      .map((j) => int.tryParse(j.id))
-      .whereType<int>()
-      .toSet();
+  Set<int> get ownedJobIds =>
+      activeJobs.map((j) => int.tryParse(j.id)).whereType<int>().toSet();
 
   DriverJobModel? _ownedJob(String id) {
     final jobId = int.tryParse(id);
@@ -74,9 +72,13 @@ class ActiveJobsController extends GetxController {
   ///
   /// Deliberately not reinstated here. See CONTRACT-9.
 
-  Future<void> startJob(String id) =>
-      _transition(id, JobTransition.start, (jobId) => _api.startActiveJob(jobId),
-          'You are en route.');
+  Future<void> startJob(String id, {String? source}) => _transition(
+    id,
+    JobTransition.start,
+    (jobId, src) => _api.startActiveJob(jobId, source: src),
+    'You are en route.',
+    source: source,
+  );
 
   /// POST `/api/v1/urban-goodz/driver/active-jobs/{id}/status` — deployed
   /// (OPTIONS -> `Allow: GET,HEAD,POST`, 2026-07-25).
@@ -89,22 +91,32 @@ class ActiveJobsController extends GetxController {
   /// call throws and the driver is told it failed; if it returns 2xx without
   /// moving the job, the driver is told it is unconfirmed. Neither path
   /// reports a pickup that did not happen.
-  Future<void> markPickedUp(String id) => _transition(
-        id,
-        JobTransition.pickup,
-        (jobId) => _api.updateActiveJobStatus(jobId, JobStatus.pickedUp),
-        'Pickup recorded.',
-      );
+  Future<void> markPickedUp(String id, {String? source}) => _transition(
+    id,
+    JobTransition.pickup,
+    (jobId, source) =>
+        _api.updateActiveJobStatus(jobId, JobStatus.pickedUp, source: source),
+    'Pickup recorded.',
+    source: source,
+  );
 
-  Future<void> completeJob(String id, {String? recipientName}) => _transition(
-        id,
-        JobTransition.deliver,
-        (jobId) =>
-            _api.completeActiveJob(jobId, recipientName: recipientName),
-        'Delivery complete.',
-      );
+  Future<void> completeJob(
+    String id, {
+    String? recipientName,
+    String? source,
+  }) => _transition(
+    id,
+    JobTransition.deliver,
+    (jobId, source) => _api.completeActiveJob(
+      jobId,
+      recipientName: recipientName,
+      source: source,
+    ),
+    'Delivery complete.',
+    source: source,
+  );
 
-  Future<void> cancelJob(String id) async {
+  Future<void> cancelJob(String id, {String? source}) async {
     final job = _ownedJob(id);
     if (job == null) {
       lastOutcome.value = TransitionOutcome.refused;
@@ -117,13 +129,13 @@ class ActiveJobsController extends GetxController {
       return;
     }
     try {
-      await _api.cancelActiveJob(int.parse(job.id));
+      await _api.cancelActiveJob(
+        int.parse(job.id),
+        source: _pick(source, job.source),
+      );
       await fetchActiveJobs();
       lastOutcome.value = TransitionOutcome.success;
-      showNotice(
-        'Job Cancelled',
-        'The job has been removed from your list.',
-      );
+      showNotice('Job Cancelled', 'The job has been removed from your list.');
     } catch (e) {
       lastOutcome.value = TransitionOutcome.failed;
       _fail('Failed to cancel job: $e');
@@ -141,9 +153,10 @@ class ActiveJobsController extends GetxController {
   Future<void> _transition(
     String id,
     JobTransition transition,
-    Future<Map<String, dynamic>> Function(int jobId) call,
-    String successMsg,
-  ) async {
+    Future<Map<String, dynamic>> Function(int jobId, String? source) call,
+    String successMsg, {
+    String? source,
+  }) async {
     final job = _ownedJob(id);
     if (job == null) {
       lastOutcome.value = TransitionOutcome.refused;
@@ -162,7 +175,7 @@ class ActiveJobsController extends GetxController {
       return;
     }
     try {
-      final updated = await call(int.parse(job.id));
+      final updated = await call(int.parse(job.id), _pick(source, job.source));
       await fetchActiveJobs();
       final newStatus = updated['status']?.toString() ?? '';
       if (newStatus.isEmpty || !JobLifecycle.confirms(transition, newStatus)) {
@@ -171,17 +184,14 @@ class ActiveJobsController extends GetxController {
           'Not confirmed',
           newStatus.isEmpty
               ? 'The server accepted the request but did not report a new '
-                  'status. Refresh to check.'
+                    'status. Refresh to check.'
               : 'The server accepted the request but the job is still '
-                  '"$newStatus". Refresh before retrying.',
+                    '"$newStatus". Refresh before retrying.',
         );
         return;
       }
       lastOutcome.value = TransitionOutcome.success;
-      showNotice(
-        'Updated',
-        successMsg,
-      );
+      showNotice('Updated', successMsg);
     } catch (e) {
       lastOutcome.value = TransitionOutcome.failed;
       if (e is ApiException && e.code == 'recipient_required') {
@@ -192,8 +202,9 @@ class ActiveJobsController extends GetxController {
     }
   }
 
-  void _fail(String message) => showNotice(
-        'Action not allowed',
-        message,
-      );
+  /// An explicit caller-supplied source wins; otherwise the job's own.
+  String? _pick(String? explicit, String? own) =>
+      (explicit != null && explicit.trim().isNotEmpty) ? explicit : own;
+
+  void _fail(String message) => showNotice('Action not allowed', message);
 }

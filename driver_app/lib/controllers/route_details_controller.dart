@@ -26,7 +26,7 @@ class RouteDetailsController extends GetxController {
   var isLoading = true.obs;
   var errorMessage = ''.obs;
 
-  void fetchRoute(String jobId) async {
+  void fetchRoute(String jobId, {String? source}) async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
@@ -35,7 +35,7 @@ class RouteDetailsController extends GetxController {
         isLoading.value = false;
         return;
       }
-      final jobData = await _api.getActiveJobDetail(jobIdInt);
+      final jobData = await _api.getActiveJobDetail(jobIdInt, source: source);
       final job = DriverJobModel.fromJson(jobData);
       currentJob.value = job;
       currentStatus.value = job.status;
@@ -96,7 +96,11 @@ class RouteDetailsController extends GetxController {
     try {
       final jobId = int.tryParse(job.id);
       if (jobId == null) return;
-      await _api.updateActiveJobStatus(jobId, driverTaskStatus);
+      await _api.updateActiveJobStatus(
+        jobId,
+        driverTaskStatus,
+        source: job.source,
+      );
       Get.snackbar(
         'Synced',
         'Status updated: $driverTaskStatus',
