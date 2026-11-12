@@ -653,6 +653,42 @@ class DriverApiService extends GetxService {
         : <String, dynamic>{};
   }
 
+  /// GET /api/v1/order-anywhere/driver/{id}/reimbursement
+  ///
+  /// `data`: {enabled, authorized_total, max_total, claim|null}. When
+  /// `enabled` is false the platform issues purchase cards instead.
+  Future<Map<String, dynamic>> getReimbursement(int requestId) async {
+    final body = await _ok(
+      await _client.authGet('/api/v1/order-anywhere/driver/$requestId/reimbursement'),
+    );
+    return body is Map && body['data'] is Map
+        ? Map<String, dynamic>.from(body['data'] as Map)
+        : <String, dynamic>{};
+  }
+
+  /// POST /api/v1/order-anywhere/driver/{id}/reimbursement (multipart)
+  ///
+  /// The driver paid with their own money; this claims it back. 422 carries a
+  /// driver-readable message (over the limit, wrong stage, claim exists).
+  Future<Map<String, dynamic>> submitReimbursement(
+    int requestId, {
+    required String receiptPath,
+    required double total,
+    String? notes,
+  }) async {
+    final form = FormData({
+      'receipt': MultipartFile(File(receiptPath), filename: _basename(receiptPath)),
+      'total': total.toStringAsFixed(2),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    });
+    final body = await _ok(
+      await _client.authPost('/api/v1/order-anywhere/driver/$requestId/reimbursement', form),
+    );
+    return body is Map && body['data'] is Map
+        ? Map<String, dynamic>.from(body['data'] as Map)
+        : <String, dynamic>{};
+  }
+
   /// Filename only — never the containing directory, so the upload does not
   /// leak the device's local filesystem layout to the server.
   static String _basename(String path) {

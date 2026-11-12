@@ -5,7 +5,7 @@ import 'package:urban_goodz_driver/models/business_job_model.dart';
 import 'package:urban_goodz_driver/models/driver_compensation.dart';
 import 'package:urban_goodz_driver/models/job_lifecycle.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
-import 'package:urban_goodz_driver/screens/purchase_card_screen.dart';
+import 'package:urban_goodz_driver/screens/reimbursement_screen.dart';
 
 class BusinessJobDetailScreen extends StatefulWidget {
   final int jobId;
@@ -78,15 +78,15 @@ class _BusinessJobDetailScreenState extends State<BusinessJobDetailScreen> {
               child: ListTile(
                 leading: const Icon(Icons.credit_card, color: AppTheme.primary),
                 title: const Text(
-                  'Purchase Card',
+                  'Purchase & receipt',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text(
-                  'View card status, submit your receipt, or report a problem',
+                  'Pay for the items, submit your receipt, or report a problem',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () =>
-                    Get.to(() => PurchaseCardScreen(requestId: job.jobId)),
+                    Get.to(() => ReimbursementScreen(requestId: job.jobId)),
               ),
             ),
           ],
