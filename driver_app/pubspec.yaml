@@ -45,6 +45,7 @@ dependencies:
   mobile_scanner: 7.0.1
   webview_flutter: ^4.14.1
   image_picker: ^1.2.3
+  signature: ^5.5.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

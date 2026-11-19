@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
+import 'package:urban_goodz_driver/services/api_client.dart';
 import 'package:urban_goodz_driver/services/driver_api_service.dart';
 import 'package:urban_goodz_driver/utils/json_number.dart';
 
@@ -99,14 +101,19 @@ class DedicatedRouteController extends GetxController {
             lng: data['lng'],
           );
         } else if (type == 'dropoff') {
+          final photoPath = data['photo_path'] as String?;
+          final signaturePath = data['signature_path'] as String?;
           await _api.scanDropoff(
             routeId,
             barcode: data['barcode'],
             lat: data['lat'],
             lng: data['lng'],
-            proofPhoto: data['proof_photo'],
-            signature: data['signature'],
+            photoFile: (photoPath != null && File(photoPath).existsSync()) ? File(photoPath) : null,
+            signatureFile: (signaturePath != null && File(signaturePath).existsSync()) ? File(signaturePath) : null,
           );
+          // Upload succeeded: the queued copies are no longer needed.
+          await _deleteIfExists(photoPath);
+          await _deleteIfExists(signaturePath);
         } else if (type == 'exception') {
           await _api.scanException(
             routeId,
@@ -119,8 +126,17 @@ class DedicatedRouteController extends GetxController {
           await _api.completeRoute(routeId);
         }
       } catch (e) {
-        if (e.toString().contains('SocketException') || e.toString().contains('Request failed')) {
+        if (e is! ApiException || !e.isClientError) {
+          // Connectivity failure (or anything we can't classify): keep the
+          // action, and its files, queued for the next retry.
           failed.add(action);
+        } else if (type == 'dropoff') {
+          // The backend rejected this one outright (e.g. required proof is
+          // still missing) — retrying later would fail the same way forever,
+          // so it's dropped rather than kept. Its files are no use to
+          // anything else, so they're cleaned up too.
+          await _deleteIfExists(data['photo_path'] as String?);
+          await _deleteIfExists(data['signature_path'] as String?);
         }
       }
     }
@@ -396,11 +412,17 @@ class DedicatedRouteController extends GetxController {
     }
   }
 
+  /// [photoFile]/[signatureFile] are the real captured camera photo and
+  /// drawn signature — never placeholder strings. Throws [ApiException] when
+  /// the backend rejects the request outright (e.g. the package still
+  /// requires proof that wasn't provided): that case is surfaced to the
+  /// caller rather than silently queued offline, since retrying later would
+  /// fail identically every time.
   Future<void> recordDeliveryDropoff(
     int routeId,
     String barcode, {
-    String? proofPhoto,
-    String? signature,
+    File? photoFile,
+    File? signatureFile,
   }) async {
     double lat = 0.0;
     double lng = 0.0;
@@ -413,16 +435,15 @@ class DedicatedRouteController extends GetxController {
       }
     }
 
-    _updatePackageStatusLocally(barcode, 'delivered');
-
     if (isOffline.value) {
+      _updatePackageStatusLocally(barcode, 'delivered');
       await queueOfflineAction('dropoff', {
         'route_id': routeId,
         'barcode': barcode,
         'lat': lat,
         'lng': lng,
-        'proof_photo': proofPhoto,
-        'signature': signature,
+        'photo_path': photoFile?.path,
+        'signature_path': signatureFile?.path,
       });
       return;
     }
@@ -433,20 +454,43 @@ class DedicatedRouteController extends GetxController {
         barcode: barcode,
         lat: lat,
         lng: lng,
-        proofPhoto: proofPhoto,
-        signature: signature,
+        photoFile: photoFile,
+        signatureFile: signatureFile,
       );
+      _updatePackageStatusLocally(barcode, 'delivered');
+      await _deleteIfExists(photoFile?.path);
+      await _deleteIfExists(signatureFile?.path);
       await fetchRouteDetail(routeId);
-    } catch (e) {
+    } on ApiException catch (e) {
+      if (e.isClientError) rethrow;
+      _updatePackageStatusLocally(barcode, 'delivered');
       await queueOfflineAction('dropoff', {
         'route_id': routeId,
         'barcode': barcode,
         'lat': lat,
         'lng': lng,
-        'proof_photo': proofPhoto,
-        'signature': signature,
+        'photo_path': photoFile?.path,
+        'signature_path': signatureFile?.path,
+      });
+    } catch (e) {
+      _updatePackageStatusLocally(barcode, 'delivered');
+      await queueOfflineAction('dropoff', {
+        'route_id': routeId,
+        'barcode': barcode,
+        'lat': lat,
+        'lng': lng,
+        'photo_path': photoFile?.path,
+        'signature_path': signatureFile?.path,
       });
     }
+  }
+
+  Future<void> _deleteIfExists(String? path) async {
+    if (path == null) return;
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 
   Future<void> recordDeliveryException(
@@ -503,6 +547,8 @@ class DedicatedRouteController extends GetxController {
             deliveryCompletionLockedUntilVerified: pkg.deliveryCompletionLockedUntilVerified,
             ageVerificationStatus: pkg.ageVerificationStatus,
             stopOrder: pkg.stopOrder,
+            requiresPhoto: pkg.requiresPhoto,
+            requiresSignature: pkg.requiresSignature,
           );
         }
         return pkg;

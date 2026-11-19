@@ -788,24 +788,44 @@ class DriverApiService extends GetxService {
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
+  /// [photoFile]/[signatureFile] are the real camera photo and drawn
+  /// signature, uploaded as `photo_file`/`signature_file` multipart fields
+  /// (the names the backend's upload handler expects — see
+  /// `UrbanGoodzDriverApiController::scanDropoff`). Placeholder strings are
+  /// never sent; a package that requires proof gets a real file or nothing.
   Future<Map<String, dynamic>> scanDropoff(
     int routeId, {
     required String barcode,
     required double lat,
     required double lng,
-    String? proofPhoto,
-    String? signature,
+    File? photoFile,
+    File? signatureFile,
   }) async {
+    final fields = <String, dynamic>{
+      'barcode': barcode,
+      'latitude': lat,
+      'longitude': lng,
+      'lat': lat,
+      'lng': lng,
+      if (photoFile != null)
+        'photo_file': MultipartFile(
+          photoFile,
+          filename: 'proof_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          contentType: 'image/jpeg',
+        ),
+      if (signatureFile != null)
+        'signature_file': MultipartFile(
+          signatureFile,
+          filename: 'signature_${DateTime.now().millisecondsSinceEpoch}.png',
+          contentType: 'image/png',
+        ),
+    };
+    final hasFiles = photoFile != null || signatureFile != null;
     final body = await _ok(
-      await _client.authPost(ApiConfig.scanDropoff(routeId), {
-        'barcode': barcode,
-        'latitude': lat,
-        'longitude': lng,
-        'lat': lat,
-        'lng': lng,
-        'proof_photo': ?proofPhoto,
-        'signature': ?signature,
-      }),
+      await _client.authPost(
+        ApiConfig.scanDropoff(routeId),
+        hasFiles ? FormData(fields) : fields,
+      ),
     );
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }

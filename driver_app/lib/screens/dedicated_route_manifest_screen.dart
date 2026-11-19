@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
 import 'package:urban_goodz_driver/screens/barcode_scan_screen.dart';
+import 'package:urban_goodz_driver/screens/delivery_photo_capture_screen.dart';
+import 'package:urban_goodz_driver/screens/signature_capture_screen.dart';
+import 'package:urban_goodz_driver/services/api_client.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 
 class DedicatedRouteManifestScreen extends StatefulWidget {
@@ -429,55 +434,112 @@ class _StopCard extends StatelessWidget {
   }
 
   void _showDeliveryPODDialog(BuildContext context, DedicatedRouteController controller, RouteStopModel stop) {
-    final photoController = TextEditingController();
-    final sigController = TextEditingController();
+    final pending = stop.packages.where((p) => p.status == 'arrived').toList();
+    final needsPhoto = pending.any((p) => p.requiresPhoto);
+    final needsSignature = pending.any((p) => p.requiresSignature);
+
+    File? photo;
+    File? signature;
+    bool submitting = false;
 
     Get.dialog(
-      AlertDialog(
-        title: Text('Proof of Delivery (Stop #${stop.stopOrder})'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: photoController,
-              decoration: const InputDecoration(
-                labelText: 'Photo URL / Path (Simulated)',
-                hintText: 'e.g. /images/pod_photo.jpg',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: sigController,
-              decoration: const InputDecoration(
-                labelText: 'Recipient Signature (Simulated)',
-                hintText: 'e.g. John Doe',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () {
-              final photo = photoController.text.trim();
-              final signature = sigController.text.trim();
-              for (var pkg in stop.packages) {
-                if (pkg.status == 'arrived') {
-                  controller.recordDeliveryDropoff(
-                    routeId,
-                    pkg.barcode,
-                    proofPhoto: photo.isNotEmpty ? photo : '/images/mock_photo.png',
-                    signature: signature.isNotEmpty ? signature : 'MOCK_SIGNATURE',
-                  );
-                }
+      StatefulBuilder(
+        builder: (context, setDialogState) {
+          final canSubmit =
+              !submitting && (!needsPhoto || photo != null) && (!needsSignature || signature != null);
+
+          Future<void> capturePhoto() async {
+            final result = await Navigator.of(context, rootNavigator: true).push<File?>(
+              MaterialPageRoute(builder: (_) => const DeliveryPhotoCaptureScreen()),
+            );
+            if (result != null) setDialogState(() => photo = result);
+          }
+
+          Future<void> captureSignature() async {
+            final result = await Navigator.of(context, rootNavigator: true).push<File?>(
+              MaterialPageRoute(builder: (_) => const SignatureCaptureScreen()),
+            );
+            if (result != null) setDialogState(() => signature = result);
+          }
+
+          Future<void> submit() async {
+            setDialogState(() => submitting = true);
+            try {
+              for (var pkg in pending) {
+                await controller.recordDeliveryDropoff(
+                  routeId,
+                  pkg.barcode,
+                  photoFile: photo,
+                  signatureFile: signature,
+                );
               }
               Get.back();
               Get.snackbar('Delivery Recorded', 'Packages delivered successfully!', backgroundColor: Colors.green, colorText: Colors.white);
-            },
-            child: const Text('Submit Delivery', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+            } on ApiException catch (e) {
+              setDialogState(() => submitting = false);
+              Get.snackbar(
+                'Proof Required',
+                e.message,
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 5),
+              );
+            } catch (e) {
+              setDialogState(() => submitting = false);
+              Get.snackbar('Delivery Failed', e.toString(), backgroundColor: Colors.red, colorText: Colors.white);
+            }
+          }
+
+          Widget proofRow(String label, bool required, File? file, VoidCallback onCapture) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      required ? '$label (required)' : '$label (optional)',
+                      style: TextStyle(
+                        fontWeight: required ? FontWeight.bold : FontWeight.normal,
+                        color: required && file == null ? Colors.red : null,
+                      ),
+                    ),
+                  ),
+                  if (file != null) const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                  const SizedBox(width: 6),
+                  OutlinedButton(
+                    onPressed: submitting ? null : onCapture,
+                    child: Text(file == null ? 'Capture' : 'Retake'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return AlertDialog(
+            title: Text('Proof of Delivery (Stop #${stop.stopOrder})'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                proofRow('Photo', needsPhoto, photo, capturePhoto),
+                proofRow('Signature', needsSignature, signature, captureSignature),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: submitting ? null : () => Get.back(), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                onPressed: canSubmit ? submit : null,
+                child: submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Submit Delivery', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

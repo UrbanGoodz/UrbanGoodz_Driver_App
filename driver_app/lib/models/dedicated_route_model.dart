@@ -127,6 +127,8 @@ class RoutePackageModel {
   final bool deliveryCompletionLockedUntilVerified;
   final String? ageVerificationStatus;
   final int stopOrder;
+  final bool requiresPhoto;
+  final bool requiresSignature;
 
   RoutePackageModel({
     required this.id,
@@ -146,6 +148,8 @@ class RoutePackageModel {
     required this.deliveryCompletionLockedUntilVerified,
     this.ageVerificationStatus,
     required this.stopOrder,
+    this.requiresPhoto = false,
+    this.requiresSignature = false,
   });
 
   factory RoutePackageModel.fromJson(Map<String, dynamic> json) {
@@ -168,6 +172,8 @@ class RoutePackageModel {
       deliveryCompletionLockedUntilVerified: json['delivery_completion_locked_until_verified'] == 1 || json['delivery_completion_locked_until_verified'] == true,
       ageVerificationStatus: json['age_verification_status'],
       stopOrder: json['stop_order'] == null ? 1 : DedicatedRouteModel._toInt(json['stop_order']),
+      requiresPhoto: json['requires_photo'] == 1 || json['requires_photo'] == true,
+      requiresSignature: json['requires_signature'] == 1 || json['requires_signature'] == true,
     );
   }
 
@@ -191,6 +197,8 @@ class RoutePackageModel {
       'delivery_completion_locked_until_verified': deliveryCompletionLockedUntilVerified,
       'age_verification_status': ageVerificationStatus,
       'stop_order': stopOrder,
+      'requires_photo': requiresPhoto,
+      'requires_signature': requiresSignature,
     };
   }
 }

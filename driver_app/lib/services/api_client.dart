@@ -112,12 +112,19 @@ class ApiException implements Exception {
   /// header on HTTP 429 responses.
   final int? retryAfterSeconds;
 
+  /// The missing-proof type from a delivery-proof 422, e.g. `{"error":
+  /// "...", "requires": "photo"}` — a different envelope from the
+  /// `errors`/`message` shape every other endpoint uses, so it needs its own
+  /// field rather than being squashed into [message] alone.
+  final String? requiresProof;
+
   ApiException(
     this.statusCode,
     this.message, {
     this.errors = const [],
     this.code = '',
     this.retryAfterSeconds,
+    this.requiresProof,
   });
 
   /// True when the backend rejected or expired the session token.
@@ -125,6 +132,12 @@ class ApiException implements Exception {
 
   /// True when the login throttle (5 attempts) has been tripped.
   bool get isRateLimited => statusCode == 429;
+
+  /// True when the backend rejected the request itself (bad data, missing
+  /// required proof, auth, etc.) rather than the request never arriving.
+  /// Retrying this later — the offline-queue default on any failure — would
+  /// just fail the same way again, so callers must surface it instead.
+  bool get isClientError => statusCode >= 400 && statusCode < 500;
 
   /// Builds an exception from the live Urban Goodz error envelopes, verified
   /// against admin.urbangoodzdelivery.com on 2026-07-23:
@@ -161,6 +174,11 @@ class ApiException implements Exception {
         });
       }
       if (body['message'] != null) message = body['message'].toString();
+      // The delivery-proof 422 uses {"error": "...", "requires": "photo"}
+      // instead of the errors[]/message envelope every other endpoint uses.
+      if (message == null && body['error'] != null) {
+        message = body['error'].toString();
+      }
     }
 
     final joined = parsed
@@ -176,12 +194,17 @@ class ApiException implements Exception {
 
     if (status == 429) retryAfter ??= 60;
 
+    final requires = body is Map ? body['requires']?.toString() : null;
+
     return ApiException(
       status,
       resolved,
       errors: parsed,
       code: parsed.isNotEmpty ? parsed.first.code : '',
       retryAfterSeconds: retryAfter,
+      requiresProof: (requires == 'photo' || requires == 'signature')
+          ? requires
+          : null,
     );
   }
 

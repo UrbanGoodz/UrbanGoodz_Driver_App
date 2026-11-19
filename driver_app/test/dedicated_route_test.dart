@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -125,9 +126,14 @@ class FakeDriverApiService extends DriverApiService {
     return {'status': 'picked_up'};
   }
 
+  File? lastDropoffPhotoFile;
+  File? lastDropoffSignatureFile;
+
   @override
-  Future<Map<String, dynamic>> scanDropoff(int routeId, {required String barcode, required double lat, required double lng, String? proofPhoto, String? signature}) async {
+  Future<Map<String, dynamic>> scanDropoff(int routeId, {required String barcode, required double lat, required double lng, File? photoFile, File? signatureFile}) async {
     scanDropoffCalled = true;
+    lastDropoffPhotoFile = photoFile;
+    lastDropoffSignatureFile = signatureFile;
     return {'status': 'delivered'};
   }
 
@@ -293,7 +299,11 @@ void main() {
 
       // Queue an offline pickup scan and an offline dropoff delivery
       await controller.recordLoadingScan(101, 'BAR-1001');
-      await controller.recordDeliveryDropoff(101, 'BAR-1002', proofPhoto: '/images/a.png', signature: 'Jane');
+      final photoFile = File('${Directory.systemTemp.path}/test_proof_photo.jpg')
+        ..writeAsBytesSync([1, 2, 3]);
+      final signatureFile = File('${Directory.systemTemp.path}/test_proof_signature.png')
+        ..writeAsBytesSync([4, 5, 6]);
+      await controller.recordDeliveryDropoff(101, 'BAR-1002', photoFile: photoFile, signatureFile: signatureFile);
 
       expect(controller.pendingActions.length, 2);
 
@@ -305,6 +315,15 @@ void main() {
       expect(controller.pendingActions.length, 0);
       expect(fakeApi.scanPickupCalled, true);
       expect(fakeApi.scanDropoffCalled, true);
+
+      // The queued drop-off carried the real proof files through to the
+      // replayed upload, not just the barcode/coordinates.
+      expect(fakeApi.lastDropoffPhotoFile, isNotNull);
+      expect(fakeApi.lastDropoffSignatureFile, isNotNull);
+
+      // And the uploaded files were cleaned up afterward, not left behind.
+      expect(photoFile.existsSync(), false);
+      expect(signatureFile.existsSync(), false);
     });
   });
 }
