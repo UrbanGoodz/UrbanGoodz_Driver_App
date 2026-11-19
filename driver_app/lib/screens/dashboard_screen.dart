@@ -52,9 +52,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    jobsCtl.fetchJobs();
-    dispatchCtl.load();
-    routesCtl.fetchAssignedRoutes();
+    // Each of these methods' first line is a reactive write (an isLoading-
+    // style flag). Calling them synchronously here lands mid-build, and the
+    // resulting Obx rebuild throws "setState() called during build" before
+    // the method's own try/finally is ever entered - so the fetch silently
+    // never happens and whatever flag it would have reset (e.g. isOffline)
+    // is left stuck at its previous value. Deferring to the next frame
+    // avoids the race. See DedicatedRouteDetailScreen.initState for the
+    // same fix with a fuller explanation.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      jobsCtl.fetchJobs();
+      dispatchCtl.load();
+      routesCtl.fetchAssignedRoutes();
+    });
 
     // Availability failures are surfaced here rather than from the controller,
     // which keeps the controller headless-testable.

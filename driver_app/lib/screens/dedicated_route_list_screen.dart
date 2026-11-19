@@ -22,7 +22,12 @@ class _DedicatedRouteListScreenState extends State<DedicatedRouteListScreen> {
   @override
   void initState() {
     super.initState();
-    controller.fetchAssignedRoutes();
+    // See DedicatedRouteDetailScreen.initState: calling a controller method
+    // whose first line is a reactive write directly from initState can throw
+    // "setState() called during build" and strand isLoading at true forever.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.fetchAssignedRoutes();
+    });
   }
 
   @override
@@ -114,13 +119,18 @@ class _DedicatedRouteListScreenState extends State<DedicatedRouteListScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          'Route ${route.routeName}',
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
+                                        Expanded(
+                                          child: Text(
+                                            'Route ${route.routeName}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(

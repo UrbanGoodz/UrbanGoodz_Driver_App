@@ -36,7 +36,11 @@ class DedicatedRouteController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: backgroundColor ?? Colors.black.withValues(alpha: 0.8),
         colorText: colorText ?? Colors.white,
-        duration: duration,
+        // Passing a bare `duration: null` through to GetX disables
+        // auto-dismiss entirely, so every call site that didn't specify one
+        // (e.g. "Sync Complete") stayed on screen indefinitely, stacking up
+        // and blocking taps on whatever was underneath it.
+        duration: duration ?? const Duration(seconds: 3),
       );
     }
   }

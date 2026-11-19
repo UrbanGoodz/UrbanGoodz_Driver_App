@@ -20,7 +20,15 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
   @override
   void initState() {
     super.initState();
-    controller.fetchRouteDetail(widget.routeId);
+    // fetchRouteDetail's first line is a reactive write (isLoading.value =
+    // true); firing it synchronously from initState lands mid-build, so the
+    // Obx listener's rebuild throws "setState() called during build" before
+    // the try block is even entered - the finally that resets isLoading
+    // never runs, and the screen spins forever without ever sending the
+    // request. Deferring to the next frame avoids the race.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.fetchRouteDetail(widget.routeId);
+    });
   }
 
   @override
