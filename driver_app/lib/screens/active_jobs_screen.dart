@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:urban_goodz_driver/controllers/business_job_controller.dart';
+import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 import 'package:urban_goodz_driver/screens/business_job_detail_screen.dart';
+import 'package:urban_goodz_driver/screens/dedicated_route_list_screen.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
 
 class ActiveJobsScreen extends StatelessWidget {
@@ -11,6 +13,7 @@ class ActiveJobsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final BusinessJobController controller = Get.find();
+    final DedicatedRouteController routesCtl = Get.find();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Active Jobs'),
@@ -35,42 +38,126 @@ class ActiveJobsScreen extends StatelessWidget {
           );
         }
         if (controller.jobs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.inbox, size: 64, color: AppTheme.dark.withAlpha(60)),
-                const SizedBox(height: 16),
-                const Text(
-                  'No assigned business jobs',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Jobs assigned to you by dispatch will appear here.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.dark.withAlpha(120),
+          return Column(
+            children: [
+              _YourRoutesCard(routesCtl: routesCtl),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inbox, size: 64, color: AppTheme.dark.withAlpha(60)),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No assigned business jobs',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Jobs assigned to you by dispatch will appear here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.dark.withAlpha(120),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         }
         return RefreshIndicator(
           onRefresh: () => controller.fetchJobs(),
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: controller.jobs.length,
+            itemCount: controller.jobs.length + 1,
             itemBuilder: (context, index) {
-              final job = controller.jobs[index];
+              if (index == 0) {
+                return _YourRoutesCard(routesCtl: routesCtl);
+              }
+              final job = controller.jobs[index - 1];
               return _JobCard(job: job);
             },
           ),
         );
       }),
     );
+  }
+}
+
+/// "Your routes" summary card at the top of the Jobs tab, the tab drivers
+/// actually watch. Dedicated routes otherwise only surface via a push
+/// notification or a buried Dashboard tile, so without this a driver can go
+/// an entire route without ever seeing it was assigned.
+class _YourRoutesCard extends StatelessWidget {
+  final DedicatedRouteController routesCtl;
+  const _YourRoutesCard({required this.routesCtl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final routes = routesCtl.assignedRoutes;
+      if (routes.isEmpty) return const SizedBox.shrink();
+
+      final hasUnstarted = routes.any((r) => r.canStart);
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        child: GestureDetector(
+          onTap: () => Get.to(() => const DedicatedRouteListScreen()),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primary.withAlpha(60)),
+            ),
+            child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(Icons.local_shipping, color: AppTheme.primary, size: 28),
+                    if (hasUnstarted)
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Your routes',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      Text(
+                        '${routes.length} assigned dedicated route${routes.length == 1 ? '' : 's'}',
+                        style: TextStyle(fontSize: 12, color: AppTheme.dark.withAlpha(150)),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
   }
 }
 

@@ -18,6 +18,7 @@ import 'package:urban_goodz_driver/screens/payout_history_screen.dart';
 import 'package:urban_goodz_driver/screens/route_details_screen.dart';
 import 'package:urban_goodz_driver/screens/vehicle_requirements_screen.dart';
 import 'package:urban_goodz_driver/screens/dedicated_route_list_screen.dart';
+import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
 import 'package:urban_goodz_driver/screens/driver_ai_assistant_screen.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
 import 'package:urban_goodz_driver/screens/marketplace_orders_screen.dart';
@@ -35,6 +36,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final DispatchNotificationController dispatchCtl = Get.put(
     DispatchNotificationController(),
   );
+  final DedicatedRouteController routesCtl = Get.put(
+    DedicatedRouteController(),
+  );
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
@@ -50,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     jobsCtl.fetchJobs();
     dispatchCtl.load();
+    routesCtl.fetchAssignedRoutes();
 
     // Availability failures are surfaced here rather than from the controller,
     // which keeps the controller headless-testable.
@@ -457,6 +462,22 @@ class _DashboardBody extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Builder(
+                    builder: (context) {
+                      final routesCtl = Get.find<DedicatedRouteController>();
+                      return Obx(
+                        () => _QuickAction(
+                          icon: Icons.local_shipping,
+                          label: 'My Routes',
+                          color: AppTheme.primary,
+                          showBadge: routesCtl.assignedRoutes.any(
+                            (r) => r.canStart,
+                          ),
+                          onTap: () => Get.to(() => const DedicatedRouteListScreen()),
+                        ),
+                      );
+                    },
+                  ),
                   _QuickAction(
                     icon: Icons.search,
                     label: 'Find Jobs',
@@ -516,18 +537,6 @@ class _DashboardBody extends StatelessWidget {
                     label: 'Payouts',
                     color: AppTheme.accent,
                     onTap: () => Get.to(() => const PayoutHistoryScreen()),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  _QuickAction(
-                    icon: Icons.local_shipping,
-                    label: 'Dedicated',
-                    color: AppTheme.primary,
-                    onTap: () => Get.to(() => const DedicatedRouteListScreen()),
                   ),
                 ],
               ),
@@ -729,12 +738,14 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool showBadge;
 
   const _QuickAction({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.showBadge = false,
   });
 
   @override
@@ -743,14 +754,33 @@ class _QuickAction extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color.withAlpha(30),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: color, size: 28),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: color.withAlpha(30),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              if (showBadge)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 6),
           Text(

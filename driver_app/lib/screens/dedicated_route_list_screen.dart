@@ -12,7 +12,12 @@ class DedicatedRouteListScreen extends StatefulWidget {
 }
 
 class _DedicatedRouteListScreenState extends State<DedicatedRouteListScreen> {
-  final DedicatedRouteController controller = Get.put(DedicatedRouteController());
+  // Registered by the dashboard (and shared with the "My Routes" tile /
+  // "Your routes" job-tab card) so everyone reflects the same fetch instead
+  // of each screen holding its own disconnected copy.
+  final DedicatedRouteController controller = Get.isRegistered<DedicatedRouteController>()
+      ? Get.find<DedicatedRouteController>()
+      : Get.put(DedicatedRouteController());
 
   @override
   void initState() {
