@@ -128,12 +128,23 @@ class FakeDriverApiService extends DriverApiService {
 
   File? lastDropoffPhotoFile;
   File? lastDropoffSignatureFile;
+  int scanDropoffCallCount = 0;
+  bool rejectDropoffAsMissingProof = false;
 
   @override
   Future<Map<String, dynamic>> scanDropoff(int routeId, {required String barcode, required double lat, required double lng, File? photoFile, File? signatureFile}) async {
     scanDropoffCalled = true;
+    scanDropoffCallCount++;
     lastDropoffPhotoFile = photoFile;
     lastDropoffSignatureFile = signatureFile;
+    if (rejectDropoffAsMissingProof && photoFile == null) {
+      // Mirrors the real backend's 422 for a package that requires a photo.
+      throw ApiException(
+        422,
+        'A delivery photo is required for this package.',
+        requiresProof: 'photo',
+      );
+    }
     return {'status': 'delivered'};
   }
 
@@ -324,6 +335,88 @@ void main() {
       // And the uploaded files were cleaned up afterward, not left behind.
       expect(photoFile.existsSync(), false);
       expect(signatureFile.existsSync(), false);
+    });
+
+    test('a 4xx rejection is flagged needs_attention, not silently dropped', () async {
+      await controller.fetchRouteDetail(101);
+      controller.isOffline.value = true;
+      fakeApi.rejectDropoffAsMissingProof = true;
+
+      // Queued with no photo - the fake backend rejects this exactly like
+      // Release 8's real required-proof 422.
+      await controller.recordDeliveryDropoff(101, 'BAR-1002');
+      expect(controller.pendingActions.length, 1);
+
+      controller.isOffline.value = false;
+      await controller.syncOfflineActions();
+
+      // The old behaviour silently dropped this and the package looked
+      // synced even though it was never delivered. It must now survive,
+      // flagged, with the server's message attached.
+      expect(controller.pendingActions.length, 1);
+      expect(controller.needsAttentionCount, 1);
+      expect(controller.pendingActions.first['status'], 'needs_attention');
+      expect(
+        controller.pendingActions.first['last_error'],
+        'A delivery photo is required for this package.',
+      );
+    });
+
+    test('a needs_attention action is never auto-retried', () async {
+      await controller.fetchRouteDetail(101);
+      controller.isOffline.value = true;
+      fakeApi.rejectDropoffAsMissingProof = true;
+      await controller.recordDeliveryDropoff(101, 'BAR-1002');
+      controller.isOffline.value = false;
+
+      await controller.syncOfflineActions();
+      expect(fakeApi.scanDropoffCallCount, 1);
+
+      // A second sync pass must skip the flagged item entirely rather than
+      // hammering the server with a request that can only fail again.
+      await controller.syncOfflineActions();
+      expect(fakeApi.scanDropoffCallCount, 1);
+      expect(controller.needsAttentionCount, 1);
+    });
+
+    test('discarding a flagged dropoff removes it and reverts the local status', () async {
+      await controller.fetchRouteDetail(101);
+      controller.isOffline.value = true;
+      fakeApi.rejectDropoffAsMissingProof = true;
+      await controller.recordDeliveryDropoff(101, 'BAR-1002');
+      controller.isOffline.value = false;
+      await controller.syncOfflineActions();
+      expect(controller.needsAttentionCount, 1);
+
+      await controller.discardOfflineAction(controller.pendingActions.first);
+
+      expect(controller.pendingActions.length, 0);
+      final stop = controller.stops.firstWhere((s) => s.packages.any((p) => p.barcode == 'BAR-1002'));
+      final pkg = stop.packages.firstWhere((p) => p.barcode == 'BAR-1002');
+      // Not stuck looking "delivered" when it never actually was.
+      expect(pkg.status, 'arrived');
+    });
+
+    test('fix and retry with real proof clears a flagged dropoff', () async {
+      await controller.fetchRouteDetail(101);
+      controller.isOffline.value = true;
+      fakeApi.rejectDropoffAsMissingProof = true;
+      await controller.recordDeliveryDropoff(101, 'BAR-1002');
+      controller.isOffline.value = false;
+      await controller.syncOfflineActions();
+      expect(controller.needsAttentionCount, 1);
+
+      final photoFile = File('${Directory.systemTemp.path}/test_retry_photo.jpg')
+        ..writeAsBytesSync([9, 9, 9]);
+      final ok = await controller.retryDropoffWithNewProof(
+        controller.pendingActions.first,
+        photoFile: photoFile,
+      );
+
+      expect(ok, true);
+      expect(controller.pendingActions.length, 0);
+      expect(controller.needsAttentionCount, 0);
+      expect(photoFile.existsSync(), false);
     });
   });
 }

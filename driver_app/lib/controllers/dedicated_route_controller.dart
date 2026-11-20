@@ -70,6 +70,7 @@ class DedicatedRouteController extends GetxController {
       'type': type,
       'data': data,
       'timestamp': DateTime.now().toIso8601String(),
+      'status': 'pending',
     });
     await _saveOfflineQueue();
     _showSnackbar(
@@ -80,76 +81,110 @@ class DedicatedRouteController extends GetxController {
     );
   }
 
+  /// Actions the server rejected outright (4xx) and that need the driver's
+  /// attention before they can go anywhere — never auto-retried, since
+  /// retrying the exact same request would just fail the same way again.
+  List<Map<String, dynamic>> get needsAttentionActions =>
+      pendingActions.where((a) => a['status'] == 'needs_attention').toList();
+
+  int get needsAttentionCount => needsAttentionActions.length;
+
+  /// Runs one queued action and returns the raw result so both the
+  /// automatic sync loop and a manual "Fix and retry" can share the same
+  /// dispatch + classification logic instead of duplicating it.
+  ///
+  /// On success: returns null and (for dropoff) deletes the queued proof
+  /// files, since the server now has its own copies.
+  /// On failure: returns the updated action map — unchanged (still
+  /// retryable) for a network/5xx failure, or stamped `needs_attention`
+  /// with the server's message for a 4xx rejection.
+  Future<Map<String, dynamic>?> _runQueuedAction(Map<String, dynamic> action) async {
+    final type = action['type'];
+    final data = action['data'] as Map<String, dynamic>;
+    // Queued offline actions are round-tripped through JSON in shared
+    // preferences, so route_id can come back as a string. A throw here
+    // would abort the whole sync loop and strand every queued scan, not
+    // just this one.
+    final routeId = jsonInt(data['route_id']);
+
+    try {
+      if (type == 'pickup') {
+        await _api.scanPickup(
+          routeId,
+          barcode: data['barcode'],
+          lat: data['lat'],
+          lng: data['lng'],
+        );
+      } else if (type == 'dropoff') {
+        final photoPath = data['photo_path'] as String?;
+        final signaturePath = data['signature_path'] as String?;
+        await _api.scanDropoff(
+          routeId,
+          barcode: data['barcode'],
+          lat: data['lat'],
+          lng: data['lng'],
+          photoFile: (photoPath != null && File(photoPath).existsSync()) ? File(photoPath) : null,
+          signatureFile: (signaturePath != null && File(signaturePath).existsSync()) ? File(signaturePath) : null,
+        );
+        // Upload succeeded: the queued copies are no longer needed.
+        await _deleteIfExists(photoPath);
+        await _deleteIfExists(signaturePath);
+      } else if (type == 'exception') {
+        await _api.scanException(
+          routeId,
+          barcode: data['barcode'],
+          reason: data['reason'],
+        );
+      } else if (type == 'start') {
+        await _api.startRoute(routeId);
+      } else if (type == 'complete') {
+        await _api.completeRoute(routeId);
+      }
+      return null;
+    } catch (e) {
+      if (e is! ApiException || !e.isClientError) {
+        // Connectivity failure (or anything we can't classify): keep the
+        // action, and its files, queued for the next automatic retry.
+        return action;
+      }
+      // The backend rejected this one outright — e.g. Release 8's required-
+      // proof 422. Retrying automatically later would fail identically
+      // forever and the package would silently stay undelivered, so this
+      // is flagged for the driver to review instead of being dropped.
+      return {
+        ...action,
+        'status': 'needs_attention',
+        'last_error': e.message,
+      };
+    }
+  }
+
   Future<void> syncOfflineActions() async {
     if (pendingActions.isEmpty || isSyncing.value) return;
     isSyncing.value = true;
     errorMessage.value = '';
 
-    List<Map<String, dynamic>> failed = [];
+    List<Map<String, dynamic>> stillQueued = [];
 
     for (var action in pendingActions) {
-      final type = action['type'];
-      final data = action['data'] as Map<String, dynamic>;
-      // Queued offline actions are round-tripped through JSON in shared
-      // preferences, so route_id can come back as a string. A throw here
-      // would abort the whole sync loop and strand every queued scan, not
-      // just this one.
-      final routeId = jsonInt(data['route_id']);
-
-      try {
-        if (type == 'pickup') {
-          await _api.scanPickup(
-            routeId,
-            barcode: data['barcode'],
-            lat: data['lat'],
-            lng: data['lng'],
-          );
-        } else if (type == 'dropoff') {
-          final photoPath = data['photo_path'] as String?;
-          final signaturePath = data['signature_path'] as String?;
-          await _api.scanDropoff(
-            routeId,
-            barcode: data['barcode'],
-            lat: data['lat'],
-            lng: data['lng'],
-            photoFile: (photoPath != null && File(photoPath).existsSync()) ? File(photoPath) : null,
-            signatureFile: (signaturePath != null && File(signaturePath).existsSync()) ? File(signaturePath) : null,
-          );
-          // Upload succeeded: the queued copies are no longer needed.
-          await _deleteIfExists(photoPath);
-          await _deleteIfExists(signaturePath);
-        } else if (type == 'exception') {
-          await _api.scanException(
-            routeId,
-            barcode: data['barcode'],
-            reason: data['reason'],
-          );
-        } else if (type == 'start') {
-          await _api.startRoute(routeId);
-        } else if (type == 'complete') {
-          await _api.completeRoute(routeId);
-        }
-      } catch (e) {
-        if (e is! ApiException || !e.isClientError) {
-          // Connectivity failure (or anything we can't classify): keep the
-          // action, and its files, queued for the next retry.
-          failed.add(action);
-        } else if (type == 'dropoff') {
-          // The backend rejected this one outright (e.g. required proof is
-          // still missing) — retrying later would fail the same way forever,
-          // so it's dropped rather than kept. Its files are no use to
-          // anything else, so they're cleaned up too.
-          await _deleteIfExists(data['photo_path'] as String?);
-          await _deleteIfExists(data['signature_path'] as String?);
-        }
+      // Items already flagged for driver review are not retried
+      // automatically — only "Fix and retry" or "Discard" touches them.
+      if (action['status'] == 'needs_attention') {
+        stillQueued.add(action);
+        continue;
       }
+      final result = await _runQueuedAction(action);
+      if (result != null) stillQueued.add(result);
     }
 
-    pendingActions.value = failed;
+    pendingActions.value = stillQueued;
     await _saveOfflineQueue();
     isSyncing.value = false;
 
-    if (failed.isEmpty) {
+    final attentionCount = stillQueued.where((a) => a['status'] == 'needs_attention').length;
+    final stillRetrying = stillQueued.length - attentionCount;
+
+    if (stillQueued.isEmpty) {
       _showSnackbar(
         'Sync Complete',
         'All offline scans and updates synchronized successfully!',
@@ -159,14 +194,96 @@ class DedicatedRouteController extends GetxController {
       if (currentRoute.value != null) {
         fetchRouteDetail(currentRoute.value!.id);
       }
+    } else if (attentionCount > 0) {
+      _showSnackbar(
+        'Action Needed',
+        '$attentionCount action${attentionCount == 1 ? '' : 's'} could not be sent and need your review.',
+        backgroundColor: Colors.red.withValues(alpha: 0.9),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
     } else {
       _showSnackbar(
         'Sync Incomplete',
-        'Failed to sync ${failed.length} items. Will retry later.',
+        'Failed to sync $stillRetrying items. Will retry later.',
         backgroundColor: Colors.red.withValues(alpha: 0.9),
         colorText: Colors.white,
       );
     }
+  }
+
+  /// Re-sends one flagged action as-is (pickup/exception/start/complete —
+  /// nothing to re-capture). Returns true on success.
+  Future<bool> retrySimpleAction(Map<String, dynamic> action) async {
+    final result = await _runQueuedAction(action);
+    if (result == null) {
+      pendingActions.removeWhere((a) => identical(a, action) || a['timestamp'] == action['timestamp']);
+      await _saveOfflineQueue();
+      if (currentRoute.value != null) fetchRouteDetail(currentRoute.value!.id);
+      return true;
+    }
+    final idx = pendingActions.indexWhere((a) => a['timestamp'] == action['timestamp']);
+    if (idx != -1) pendingActions[idx] = result;
+    await _saveOfflineQueue();
+    return false;
+  }
+
+  /// Re-sends a flagged dropoff with freshly captured proof. Returns true on
+  /// success.
+  Future<bool> retryDropoffWithNewProof(
+    Map<String, dynamic> action, {
+    File? photoFile,
+    File? signatureFile,
+  }) async {
+    final data = Map<String, dynamic>.from(action['data'] as Map<String, dynamic>);
+    // The old queued files (if any) are superseded by whatever was just
+    // captured; stop tracking them so a later cleanup pass doesn't trip
+    // over a path that's about to be orphaned.
+    final oldPhotoPath = data['photo_path'] as String?;
+    final oldSignaturePath = data['signature_path'] as String?;
+    data['photo_path'] = photoFile?.path ?? oldPhotoPath;
+    data['signature_path'] = signatureFile?.path ?? oldSignaturePath;
+
+    final retryAction = {...action, 'data': data, 'status': 'pending'};
+    final result = await _runQueuedAction(retryAction);
+
+    if (result == null) {
+      if (photoFile != null) await _deleteIfExists(oldPhotoPath);
+      if (signatureFile != null) await _deleteIfExists(oldSignaturePath);
+      pendingActions.removeWhere((a) => a['timestamp'] == action['timestamp']);
+      await _saveOfflineQueue();
+      if (currentRoute.value != null) fetchRouteDetail(currentRoute.value!.id);
+      return true;
+    }
+    final idx = pendingActions.indexWhere((a) => a['timestamp'] == action['timestamp']);
+    if (idx != -1) pendingActions[idx] = result;
+    await _saveOfflineQueue();
+    return false;
+  }
+
+  /// Permanently removes a flagged action without sending it. Reverts the
+  /// package's optimistic local status so the manifest screen shows it
+  /// still needs action, rather than claiming it was delivered/picked up
+  /// when the server never actually received that.
+  Future<void> discardOfflineAction(Map<String, dynamic> action) async {
+    final type = action['type'];
+    final data = action['data'] as Map<String, dynamic>;
+    final barcode = data['barcode'] as String?;
+
+    if (barcode != null) {
+      if (type == 'dropoff') {
+        _updatePackageStatusLocally(barcode, 'arrived');
+      } else if (type == 'pickup') {
+        _updatePackageStatusLocally(barcode, 'pending');
+      } else if (type == 'exception') {
+        _updatePackageStatusLocally(barcode, 'arrived');
+      }
+    }
+
+    await _deleteIfExists(data['photo_path'] as String?);
+    await _deleteIfExists(data['signature_path'] as String?);
+    pendingActions.removeWhere((a) => a['timestamp'] == action['timestamp']);
+    await _saveOfflineQueue();
   }
 
   // ---------- Fetch Operations ----------

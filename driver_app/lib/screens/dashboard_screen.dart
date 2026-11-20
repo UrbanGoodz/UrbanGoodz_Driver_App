@@ -19,6 +19,7 @@ import 'package:urban_goodz_driver/screens/route_details_screen.dart';
 import 'package:urban_goodz_driver/screens/vehicle_requirements_screen.dart';
 import 'package:urban_goodz_driver/screens/dedicated_route_list_screen.dart';
 import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
+import 'package:urban_goodz_driver/screens/offline_actions_review_screen.dart';
 import 'package:urban_goodz_driver/screens/driver_ai_assistant_screen.dart';
 import 'package:urban_goodz_driver/models/business_job_model.dart';
 import 'package:urban_goodz_driver/screens/marketplace_orders_screen.dart';
@@ -226,6 +227,7 @@ class _DashboardBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const _ActionNeededBanner(),
               Row(
                 children: [
                   CircleAvatar(
@@ -552,6 +554,53 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
             ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+/// Persistent, hard-to-miss banner for queued actions the server rejected
+/// outright (e.g. a drop-off missing required proof). It sits at the top of
+/// the Dashboard — not just the route screens — because a driver may never
+/// go back to the route that produced the rejection otherwise, and a
+/// silently-dropped rejection used to leave a package looking synced that
+/// was never actually delivered.
+class _ActionNeededBanner extends StatelessWidget {
+  const _ActionNeededBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final routesCtl = Get.find<DedicatedRouteController>();
+    return Obx(() {
+      final count = routesCtl.needsAttentionCount;
+      if (count == 0) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: GestureDetector(
+          onTap: () => Get.to(() => const OfflineActionsReviewScreen()),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.red.withAlpha(25),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red, width: 1.5),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.red),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$count action${count == 1 ? '' : 's'} couldn\'t be sent. Tap to review.',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.red),
+              ],
+            ),
           ),
         ),
       );
