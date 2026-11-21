@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -21,6 +22,30 @@ class DedicatedRouteController extends GetxController {
   var errorMessage = ''.obs;
 
   var pendingActions = <Map<String, dynamic>>[].obs;
+
+  /// stop_order -> single-stop Google Maps link, from GET .../routes/{id}/map.
+  var stopNavigateUrls = <int, String>{}.obs;
+  /// Ready-made multi-stop Maps trip covering the next pending stops.
+  var nextTripUrl = Rxn<String>();
+
+  /// Refreshes the navigate links. Call again after each delivery so
+  /// `nextTripUrl` advances to cover the stops that are still pending.
+  Future<void> fetchRouteMap(int routeId) async {
+    try {
+      final map = await _api.getRouteMap(routeId);
+      final rawStops = map['stops'] as List? ?? [];
+      stopNavigateUrls.value = {
+        for (final s in rawStops)
+          if (s is Map && s['stop_order'] != null && s['navigate_url'] != null)
+            (s['stop_order'] as num).toInt(): s['navigate_url'] as String,
+      };
+      final trip = map['next_trip'];
+      nextTripUrl.value = (trip is Map && trip['url'] != null) ? trip['url'] as String : null;
+    } catch (_) {
+      // Navigation is a convenience on top of the route data already shown;
+      // leave whatever links were already loaded rather than erroring the screen.
+    }
+  }
 
   @override
   void onInit() {
@@ -320,6 +345,10 @@ class DedicatedRouteController extends GetxController {
       final detail = await _api.getRouteDetail(routeId);
       _parseDetailResponse(detail);
       isOffline.value = false;
+      // Fire-and-forget: refreshes navigate links/next trip alongside every
+      // route-detail refresh (including the ones after each delivery), so
+      // this never needs its own call site to stay current.
+      unawaited(fetchRouteMap(routeId));
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('dedicated_route_detail_cache_$routeId', json.encode(detail));

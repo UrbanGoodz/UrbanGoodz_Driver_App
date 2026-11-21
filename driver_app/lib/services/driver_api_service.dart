@@ -713,6 +713,18 @@ class DriverApiService extends GetxService {
     return body is Map ? Map<String, dynamic>.from(body) : {};
   }
 
+  /// GET /api/v1/urban-goodz/driver/routes/{id}/map
+  ///
+  /// `navigate_url` per stop and a ready-made `next_trip.url` covering the
+  /// next pending stops, so the app never has to reconstruct the Maps
+  /// multi-stop URL itself from raw coordinates.
+  Future<Map<String, dynamic>> getRouteMap(int routeId) async {
+    final body = await _ok(
+      await _client.authGet(ApiConfig.routeMap(routeId)),
+    );
+    return body is Map ? Map<String, dynamic>.from(body) : {};
+  }
+
   Future<Map<String, dynamic>> resequenceRoute(
     int routeId,
     String endpointType,

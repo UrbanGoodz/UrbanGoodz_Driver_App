@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Keeps location reporting alive with the screen off or another app
+         briefly in front while the driver is online, via a persistent
+         notification. Does not request "always" background location. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <!-- Barcode/QR scanning on the route manifest screen. Declared optional so
          the app still installs on a device without a camera; the manifest
          screen keeps manual barcode entry as a fallback for damaged labels. -->

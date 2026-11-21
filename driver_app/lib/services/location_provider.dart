@@ -69,9 +69,26 @@ class GeolocatorLocationProvider implements LocationProvider {
   @override
   Stream<DriverPosition> positionStream({int distanceFilterMeters = 25}) {
     return Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
+      locationSettings: AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: distanceFilterMeters,
+        // A pure distance filter sends nothing while the driver is stopped
+        // (loading at a pickup, waiting at a light), so this also caps the
+        // interval between fixes regardless of movement.
+        intervalDuration: const Duration(seconds: 20),
+        // Keeps the OS from suspending location updates when the screen is
+        // off or another app is briefly in front, without needing the
+        // "always" background-location permission. Per the plugin: this
+        // raises priority, it does not guarantee survival if the activity
+        // itself is destroyed (e.g. swiped from recents).
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Urban Goodz Driver is online',
+          notificationText:
+              'Sharing your location so dispatch can route deliveries to you.',
+          notificationChannelName: 'Driver location sharing',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
       ),
     ).map(_toDriverPosition);
   }

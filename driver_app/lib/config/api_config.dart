@@ -147,6 +147,7 @@ class ApiConfig {
   // Dedicated Routes (Stage A & B)
   static const String assignedRoutes = '$driverApiPrefix/routes';
   static String routeDetail(int routeId) => '$driverApiPrefix/routes/$routeId';
+  static String routeMap(int routeId) => '$driverApiPrefix/routes/$routeId/map';
   static String resequenceRoute(int routeId) =>
       '$driverApiPrefix/routes/$routeId/sequence';
   static String routeFinish(int routeId) =>

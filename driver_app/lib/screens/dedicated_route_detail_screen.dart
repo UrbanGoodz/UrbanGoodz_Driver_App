@@ -303,13 +303,17 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
     );
   }
 
-  /// Opens Google Maps multi-stop directions for every stop not yet
-  /// delivered/failed/returned, in the order the route was sorted to.
+  /// Opens Google Maps multi-stop directions covering the next pending
+  /// stops, via GET .../routes/{id}/map's `next_trip.url` (origin is left
+  /// out so Maps starts from wherever the driver actually is). The
+  /// controller refreshes this link after every delivery, so it always
+  /// covers what's still left rather than what was true when the screen
+  /// first loaded.
   Future<void> _openNavigation(DedicatedRouteModel route) async {
-    final remainingStops = controller.stops.where((s) => !s.isCompleted).toList()
-      ..sort((a, b) => a.stopOrder.compareTo(b.stopOrder));
+    await controller.fetchRouteMap(route.id);
+    final tripUrl = controller.nextTripUrl.value;
 
-    if (remainingStops.isEmpty) {
+    if (tripUrl == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No remaining stops to navigate to.')),
@@ -317,18 +321,7 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
       return;
     }
 
-    final destination = remainingStops.last;
-    final waypointStops = remainingStops.sublist(0, remainingStops.length - 1);
-
-    final uri = Uri.https('www.google.com', '/maps/dir/', {
-      'api': '1',
-      'origin': '${route.pickupLat},${route.pickupLng}',
-      'destination': '${destination.lat},${destination.lng}',
-      'travelmode': 'driving',
-      if (waypointStops.isNotEmpty) 'waypoints': waypointStops.map((s) => '${s.lat},${s.lng}').join('|'),
-    });
-
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    if (!await launchUrl(Uri.parse(tripUrl), mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open navigation.')),

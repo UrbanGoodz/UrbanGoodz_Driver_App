@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_goodz_driver/controllers/dashboard_controller.dart';
 import 'package:urban_goodz_driver/controllers/driver_auth_controller.dart';
 import 'package:urban_goodz_driver/controllers/business_job_controller.dart';
@@ -115,6 +116,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
+/// Shown once, before the OS permission dialog, so the driver sees a plain-
+/// language reason before Android's generic prompt rather than instead of it.
+Future<void> _goOnline(BuildContext context, DashboardController c) async {
+  if (c.driverStatus.value != 'online') {
+    final prefs = await SharedPreferences.getInstance();
+    const key = 'location_rationale_shown';
+    if (prefs.getBool(key) != true) {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Share your location while online'),
+          content: const Text(
+            'While you\'re online, Urban Goodz shares your location with '
+            'dispatch so nearby deliveries can be routed to you and the '
+            'admin team can see your route progress. It stops as soon as '
+            'you go offline.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
+      await prefs.setBool(key, true);
+    }
+  }
+  if (!context.mounted) return;
+  c.toggleOnlineStatus();
+}
+
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody();
 
@@ -164,7 +198,7 @@ class _DashboardBody extends StatelessWidget {
                       value: c.driverStatus.value == 'online',
                       onChanged: c.isTogglingStatus.value
                           ? null
-                          : (_) => c.toggleOnlineStatus(),
+                          : (_) => _goOnline(context, c),
                       activeThumbColor: AppTheme.white,
                       activeTrackColor: AppTheme.accent,
                     ),

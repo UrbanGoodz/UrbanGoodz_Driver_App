@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
 import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
 import 'package:urban_goodz_driver/screens/barcode_scan_screen.dart';
@@ -311,6 +312,18 @@ class _StopCard extends StatelessWidget {
               ),
           ],
         ),
+        trailing: stop.isCompleted
+            ? null
+            : Obx(() {
+                final url = controller.stopNavigateUrls[stop.stopOrder];
+                return IconButton(
+                  icon: const Icon(Icons.navigation),
+                  tooltip: 'Navigate to this stop',
+                  onPressed: url == null
+                      ? null
+                      : () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                );
+              }),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
