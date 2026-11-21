@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:urban_goodz_driver/controllers/dedicated_route_controller.dart';
+import 'package:urban_goodz_driver/models/dedicated_route_model.dart';
 import 'package:urban_goodz_driver/screens/dedicated_route_manifest_screen.dart';
 import 'package:urban_goodz_driver/theme/app_theme.dart';
 
@@ -234,6 +236,19 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            icon: const Icon(Icons.navigation, color: Colors.white),
+                            label: const Text('Navigate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            onPressed: () => _openNavigation(route),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue.shade700,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -288,19 +303,54 @@ class _DedicatedRouteDetailScreenState extends State<DedicatedRouteDetailScreen>
     );
   }
 
+  /// Opens Google Maps multi-stop directions for every stop not yet
+  /// delivered/failed/returned, in the order the route was sorted to.
+  Future<void> _openNavigation(DedicatedRouteModel route) async {
+    final remainingStops = controller.stops.where((s) => !s.isCompleted).toList()
+      ..sort((a, b) => a.stopOrder.compareTo(b.stopOrder));
+
+    if (remainingStops.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No remaining stops to navigate to.')),
+      );
+      return;
+    }
+
+    final destination = remainingStops.last;
+    final waypointStops = remainingStops.sublist(0, remainingStops.length - 1);
+
+    final uri = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'origin': '${route.pickupLat},${route.pickupLng}',
+      'destination': '${destination.lat},${destination.lng}',
+      'travelmode': 'driving',
+      if (waypointStops.isNotEmpty) 'waypoints': waypointStops.map((s) => '${s.lat},${s.lng}').join('|'),
+    });
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open navigation.')),
+      );
+    }
+  }
+
   Widget _buildStatRow(IconData icon, String title, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 20, color: AppTheme.primary),
         const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
       ],
     );
